@@ -1,14 +1,146 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CarburantRadar</title>
+<meta name="theme-color" content="#f5a623">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;color:#e8e8f0;font-family:sans-serif;padding:20px}
+header{background:#16161f;border-bottom:1px solid #252535;padding:16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;margin:-20px -20px 20px}
+.ico{width:36px;height:36px;background:#f5a623;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px}
+h1{font-size:17px;font-weight:800}.h1 span{color:#f5a623}
+.sub{font-size:10px;color:#6b6b8a}
+button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px}
+.fuels,.radii{display:flex;gap:4px;background:#16161f;border:1px solid #252535;border-radius:10px;padding:4px;margin-bottom:10px;overflow-x:auto}
+.fuels::-webkit-scrollbar,.radii::-webkit-scrollbar{display:none}
+.fb,.rb{padding:8px 12px;border-radius:8px;background:transparent;border:none;color:#6b6b8a;font-size:12px;cursor:pointer;white-space:nowrap}
+.fb.a{background:#ff6b35;color:#fff;font-weight:700}
+.rb.a{background:#f5a623;color:#000;font-weight:700}
+#status{display:none;background:#16161f;border:1px solid #252535;border-radius:10px;padding:10px 14px;font-size:12px;color:#6b6b8a;margin-bottom:12px}
+#status.on{display:block}
+.stats{display:none;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
+.stats.on{display:grid}
+.stat{background:#16161f;border:1px solid #252535;border-radius:10px;padding:10px;text-align:center}
+.sl{font-size:9px;color:#6b6b8a;text-transform:uppercase;letter-spacing:1px}
+.sv{font-size:19px;font-weight:800}
+.card{background:#16161f;border:1px solid #252535;border-radius:14px;padding:16px;margin-bottom:10px}
+.card.best{border-color:#3ddc97}
+.badge{display:inline-block;background:#3ddc97;color:#000;font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;margin-bottom:6px}
+.rank{font-size:10px;color:#6b6b8a;margin-bottom:4px}
+.name{font-size:15px;font-weight:700;margin-bottom:2px}
+.brand{font-size:10px;color:#f5a623;text-transform:uppercase;margin-bottom:6px}
+.addr{font-size:11px;color:#6b6b8a;margin-bottom:12px}
+.metrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
+.m{background:#0a0a0f;border-radius:8px;padding:8px;text-align:center}
+.ml{font-size:8px;color:#6b6b8a;text-transform:uppercase;margin-bottom:2px}
+.mv{font-size:13px;font-weight:600}
+.mv.p{color:#f5a623}.mv.d{color:#e8e8f0}.mv.s{color:#3ddc97}
+.bar{height:4px;background:#0a0a0f;border-radius:4px;overflow:hidden;margin-bottom:10px}
+.fill{height:100%;background:linear-gradient(90deg,#3ddc97,#f5a623)}
+.go{display:block;width:100%;padding:10px;background:#f5a623;color:#000;border:none;border-radius:9px;font-size:13px;font-weight:700;text-align:center;text-decoration:none;cursor:pointer}
+.empty{text-align:center;padding:50px 20px;color:#6b6b8a}
+.spinner{width:30px;height:30px;border:3px solid #252535;border-top-color:#f5a623;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
 </head>
 <body>
-<p>Chargement...</p>
+<header>
+<div class="ico">⛽</div>
+<div><div class="h1">Carburant<span style="color:#f5a623">Radar</span></div><div class="sub">PRIX EN TEMPS RÉEL</div></div>
+</header>
+
+<button id="locBtn" onclick="locate()">📍 Me localiser</button>
+
+<div class="fuels" id="fg">
+<button class="fb a" data-f="Gazole" onclick="sf(this)">Diesel</button>
+<button class="fb" data-f="SP95" onclick="sf(this)">SP95</button>
+<button class="fb" data-f="SP98" onclick="sf(this)">SP98</button>
+<button class="fb" data-f="E10" onclick="sf(this)">E10</button>
+<button class="fb" data-f="E85" onclick="sf(this)">E85</button>
+<button class="fb" data-f="GPLc" onclick="sf(this)">GPL</button>
+</div>
+
+<div class="radii" id="rg">
+<button class="rb a" data-k="5" onclick="sr(this)">5 km</button>
+<button class="rb" data-k="10" onclick="sr(this)">10 km</button>
+<button class="rb" data-k="20" onclick="sr(this)">20 km</button>
+<button class="rb" data-k="50" onclick="sr(this)">50 km</button>
+</div>
+
+<div id="status"></div>
+<div class="stats" id="stats">
+<div class="stat"><div class="sl">Stations</div><div class="sv" id="sc" style="color:#f5a623">—</div></div>
+<div class="stat"><div class="sl">Prix min</div><div class="sv" id="sm" style="color:#3ddc97">—</div></div>
+<div class="stat"><div class="sl">Prix moy</div><div class="sv" id="sa" style="color:#ff6b35">—</div></div>
+</div>
+<div id="content"><div class="empty"><div style="font-size:40px;margin-bottom:10px">⛽</div><div style="font-size:16px;font-weight:700;color:#e8e8f0;margin-bottom:6px">Prêt à démarrer</div><div style="font-size:13px">Appuie sur Me localiser</div></div></div>
+
 <script>
-window.location.href = "https://cerulean-duckanoo-42cee5.netlify.app";
+let la=null,lo=null,fu='Gazole',ra=5,st=[];
+const PK={Gazole:'gazole_prix',SP95:'sp95_prix',SP98:'sp98_prix',E10:'e10_prix',E85:'e85_prix',GPLc:'gplc_prix'};
+const MK={Gazole:'gazole_maj',SP95:'sp95_maj',SP98:'sp98_maj',E10:'e10_maj',E85:'e85_maj',GPLc:'gplc_maj'};
+const FL={Gazole:'Diesel',SP95:'SP95',SP98:'SP98',E10:'E10',E85:'E85',GPLc:'GPL'};
+function ss(m){const e=document.getElementById('status');e.textContent=m;e.className='on'}
+function sc(h){document.getElementById('content').innerHTML=h}
+function sf(b){document.querySelectorAll('.fb').forEach(x=>x.classList.remove('a'));b.classList.add('a');fu=b.dataset.f;if(st.length)render()}
+function sr(b){document.querySelectorAll('.rb').forEach(x=>x.classList.remove('a'));b.classList.add('a');ra=parseInt(b.dataset.k);if(la)load()}
+function hv(a,b,c,d){const R=6371,dL=(c-a)*Math.PI/180,dO=(d-b)*Math.PI/180,x=Math.sin(dL/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dO/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
+function locate(){
+  const btn=document.getElementById('locBtn');
+  btn.disabled=true;btn.textContent='⏳ Localisation…';ss('Accès à ta position…');
+  navigator.geolocation.getCurrentPosition(
+    p=>{la=p.coords.latitude;lo=p.coords.longitude;btn.textContent='🔄 Actualiser';btn.disabled=false;load()},
+    ()=>{ss('Erreur — vérifie les permissions');btn.disabled=false;btn.textContent='📍 Me localiser'},
+    {enableHighAccuracy:true,timeout:12000}
+  )
+}
+async function load(){
+  ss('Chargement des prix…');
+  sc('<div class="empty"><div class="spinner"></div><div style="font-size:14px;color:#e8e8f0">Recherche en cours…</div></div>');
+  document.getElementById('stats').className='stats';
+  const B='https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records';
+  const Q=`limit=100&where=dist(geo_point_borne%2C+geom'POINT(${lo}+${la})'%2C+${ra*1000}m)&select=id%2Cadresse%2Cville%2Ccp%2Clat%2Clon%2Cgazole_prix%2Csp95_prix%2Csp98_prix%2Ce10_prix%2Ce85_prix%2Cgplc_prix%2Cnom%2Cgazole_maj%2Csp95_maj%2Csp98_maj%2Ce10_maj%2Ce85_maj%2Cgplc_maj&order_by=dist(geo_point_borne%2C+geom'POINT(${lo}+${la})')`;
+  let data=null;
+  for(const[l,f] of [['direct',()=>fetch(`${B}?${Q}`)],['proxy',()=>fetch(`https://corsproxy.io/?${encodeURIComponent(`${B}?${Q}`)}`)],['allorigins',()=>fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(`${B}?${Q}`)}`)]]) {
+    try{ss(`Chargement (${l})…`);const r=await f();if(!r.ok)continue;const raw=await r.json();const p=raw.contents?JSON.parse(raw.contents):raw;if(p&&Array.isArray(p.results)){data=p;break}}catch(e){console.warn(l,e.message)}
+  }
+  if(!data){ss('Erreur — vérifie ta connexion');sc('<div class="empty"><div style="font-size:30px">⚠️</div><div style="color:#e8e8f0;font-weight:700;margin:8px 0">Erreur</div><div style="font-size:13px">Actualise pour réessayer</div></div>');return}
+  st=data.results.map(r=>{const rl=parseFloat(r.lat)/100000,rn=parseFloat(r.lon)/100000,px=parseFloat(r[PK[fu]]);return{id:r.id,nom:r.nom||'Station',adresse:r.adresse||'',ville:r.ville||'',cp:r.cp||'',lat:rl,lon:rn,prix:isNaN(px)?null:px,distance:hv(la,lo,rl,rn),maj:r[MK[fu]],fuels:Object.keys(PK).filter(f=>r[PK[f]]!=null&&r[PK[f]]!=='')}});
+  render();
+}
+function render(){
+  const wp=st.filter(s=>s.prix>0),np=st.filter(s=>!s.prix||s.prix<=0);
+  const ps=wp.map(s=>s.prix),ds=wp.map(s=>s.distance);
+  const mnP=Math.min(...ps),mxP=Math.max(...ps),mnD=Math.min(...ds),mxD=Math.max(...ds);
+  const sc2=wp.map(s=>({...s,score:Math.round((1-((mxP===mnP?0:(s.prix-mnP)/(mxP-mnP))*.6+(mxD===mnD?0:(s.distance-mnD)/(mxD-mnD))*.4))*100)})).sort((a,b)=>b.score-a.score);
+  const all=[...sc2,...np.map(s=>({...s,score:null}))];
+  if(!all.length){ss('Aucune station trouvée');sc('<div class="empty"><div style="font-size:30px">🔍</div><div style="color:#e8e8f0;font-weight:700;margin:8px 0">Aucune station</div><div style="font-size:13px">Augmente le rayon</div></div>');return}
+  if(ps.length){document.getElementById('sc').textContent=all.length;document.getElementById('sm').textContent=Math.min(...ps).toFixed(3)+' €';document.getElementById('sa').textContent=(ps.reduce((a,b)=>a+b,0)/ps.length).toFixed(3)+' €';document.getElementById('stats').className='stats on'}
+  ss(`${all.length} stations · ${FL[fu]} · ${ra} km ✓`);
+  sc(all.map((s,i)=>{
+    const best=i===0&&s.score!==null;
+    const dist=s.distance<1?`${Math.round(s.distance*1000)} m`:`${s.distance.toFixed(1)} km`;
+    const prix=s.prix?`${s.prix.toFixed(3)} €`:'N/A';
+    const maps=`https://www.google.com/maps/dir/?api=1&origin=${la},${lo}&destination=${s.lat},${s.lon}&travelmode=driving`;
+    return`<div class="card${best?' best':''}">
+${best?'<div class="badge">⭐ MEILLEUR RATIO</div><br>':''}
+<div class="rank">#${i+1}${s.score!==null?' · SCORE '+s.score+'/100':''}</div>
+<div class="name">${s.nom}</div>
+<div class="brand">${br(s.nom)}</div>
+<div class="addr">📍 ${s.adresse}, ${s.cp} ${s.ville}</div>
+<div class="metrics">
+<div class="m"><div class="ml">Prix/L</div><div class="mv p">${prix}</div></div>
+<div class="m"><div class="ml">Distance</div><div class="mv d">${dist}</div></div>
+<div class="m"><div class="ml">Score</div><div class="mv s">${s.score!==null?s.score+'/100':'—'}</div></div>
+</div>
+${s.score!==null?`<div class="bar"><div class="fill" style="width:${s.score}%"></div></div>`:''}
+<a class="go" href="${maps}" target="_blank">🗺️ Y aller</a>
+</div>`;
+  }).join(''));
+}
+function br(n){if(!n)return'';n=n.toLowerCase();if(n.includes('total'))return'TotalEnergies';if(n.includes('leclerc'))return'E.Leclerc';if(n.includes('intermarch'))return'Intermarché';if(n.includes('carrefour'))return'Carrefour';if(n.includes('super u'))return'Super U';if(n.includes('shell'))return'Shell';if(n.includes('bp'))return'BP';if(n.includes('esso'))return'Esso';return''}
 </script>
 </body>
 </html>
