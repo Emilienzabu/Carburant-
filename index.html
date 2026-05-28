@@ -109,7 +109,11 @@ async function load(){
     if(r.ok){const raw=await r.json();if(raw&&Array.isArray(raw.results))data=raw;}
   }catch(e){console.warn(e)}
   if(!data){ss('Erreur — vérifie ta connexion');sc('<div class="empty"><div style="font-size:30px">⚠️</div><div style="color:#e8e8f0;font-weight:700;margin:8px 0">Erreur</div><div style="font-size:13px">Actualise pour réessayer</div></div>');return}
-  st=data.results.map(r=>{const rl=parseFloat(r.lat)/100000,rn=parseFloat(r.lon)/100000,px=parseFloat(r[PK[fu]]);return{id:r.id,nom:r.nom||'Station',adresse:r.adresse||'',ville:r.ville||'',cp:r.cp||'',lat:rl,lon:rn,prix:isNaN(px)?null:px,distance:hv(la,lo,rl,rn),maj:r[MK[fu]],fuels:Object.keys(PK).filter(f=>r[PK[f]]!=null&&r[PK[f]]!=='')}});
+  st=data.results.map(r=>{
+    const rl=parseFloat(r.lat),rn=parseFloat(r.lon);
+    const px=parseFloat(r[PK[fu]]);
+    return{id:r.id,nom:r.nom||'Station',adresse:r.adresse||'',ville:r.ville||'',cp:r.cp||'',lat:rl,lon:rn,prix:isNaN(px)?null:px,distance:hv(la,lo,rl,rn),maj:r[MK[fu]],fuels:Object.keys(PK).filter(f=>r[PK[f]]!=null&&r[PK[f]]!=='')};
+  });
   render();
 }
 function render(){
