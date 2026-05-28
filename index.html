@@ -49,9 +49,7 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
 <div class="ico">⛽</div>
 <div><div class="h1">Carburant<span>Radar</span></div><div class="sub">PRIX EN TEMPS RÉEL</div></div>
 </header>
-
 <button id="locBtn" onclick="locate()">📍 Me localiser</button>
-
 <div class="fuels" id="fg">
 <button class="fb a" data-f="Gazole" onclick="sf(this)">Diesel</button>
 <button class="fb" data-f="SP95" onclick="sf(this)">SP95</button>
@@ -60,14 +58,12 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
 <button class="fb" data-f="E85" onclick="sf(this)">E85</button>
 <button class="fb" data-f="GPLc" onclick="sf(this)">GPL</button>
 </div>
-
 <div class="radii" id="rg">
 <button class="rb a" data-k="5" onclick="sr(this)">5 km</button>
 <button class="rb" data-k="10" onclick="sr(this)">10 km</button>
 <button class="rb" data-k="20" onclick="sr(this)">20 km</button>
 <button class="rb" data-k="50" onclick="sr(this)">50 km</button>
 </div>
-
 <div id="status"></div>
 <div class="stats" id="stats">
 <div class="stat"><div class="sl">Stations</div><div class="sv" id="sc" style="color:#f5a623">—</div></div>
@@ -99,22 +95,12 @@ async function load(){
   ss('Chargement des prix…');
   sc('<div class="empty"><div class="spinner"></div><div style="font-size:14px;color:#e8e8f0">Recherche en cours…</div></div>');
   document.getElementById('stats').className='stats';
-  
-  // Format correct : longitude latitude pour POINT, distance en mètres
-  const distFilter=`dist(geo_point_borne, geom'POINT(${lo} ${la})', ${ra*1000}m)`;
-  const params=new URLSearchParams({
-    limit: 100,
-    where: distFilter
-  });
-  
   let data=null;
   try{
-    const r=await fetch(`${PROXY}?${params.toString()}`);
+    const r=await fetch(`${PROXY}?lat=${la}&lon=${lo}&dist=${ra*1000}&limit=100`);
     if(r.ok){const raw=await r.json();if(raw&&Array.isArray(raw.results))data=raw;}
   }catch(e){console.warn(e)}
-  
   if(!data){ss('Erreur — vérifie ta connexion');sc('<div class="empty"><div style="font-size:30px">⚠️</div><div style="color:#e8e8f0;font-weight:700;margin:8px 0">Erreur</div><div style="font-size:13px">Actualise pour réessayer</div></div>');return}
-  
   st=data.results.map(r=>{
     const rl=r.geom?r.geom.lat:parseFloat(r.latitude)/100000;
     const rn=r.geom?r.geom.lon:parseFloat(r.longitude)/100000;
@@ -154,4 +140,4 @@ ${s.score!==null?`<div class="bar"><div class="fill" style="width:${s.score}%"><
 }
 </script>
 </body>
-</html> 
+</html>
