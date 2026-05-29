@@ -134,7 +134,7 @@ ${best?'<div class="badge">⭐ MEILLEUR RATIO</div><br>':''}
 <div class="m"><div class="ml">Distance</div><div class="mv d">${dist}</div></div>
 <div class="m"><div class="ml">Score</div><div class="mv s">${s.score!==null?s.score+'/100':'—'}</div></div>
 </div>
-${s.score!==null?`<div class="bar"><div class="fill" style="width:${s.score}%"></div></div>`,''}
+${s.score!==null?`<div class="bar"><div class="fill" style="width:${s.score}%"></div></div>`:''}
 <a class="go" href="${maps}" target="_blank">🗺️ Y aller</a>
 </div>`;
   }).join(''));
