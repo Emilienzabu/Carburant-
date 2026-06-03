@@ -72,7 +72,7 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
 </div>
 <div id="content">
 <div class="empty">
-<div style="font-size:40px;margin-bottom:10px">X</div>
+<div style="font-size:40px;margin-bottom:10px">⛽</div>
 <div style="font-size:16px;font-weight:700;color:#e8e8f0;margin-bottom:6px">Pret a demarrer</div>
 <div style="font-size:13px">Appuie sur Me localiser</div>
 </div>
@@ -83,64 +83,36 @@ var PK={Gazole:"gazole_prix",SP95:"sp95_prix",SP98:"sp98_prix",E10:"e10_prix",E8
 var FL={Gazole:"Diesel",SP95:"SP95",SP98:"SP98",E10:"E10",E85:"E85",GPLc:"GPL"};
 var PROXY="https://carburant-proxy.emilienzabukovec09.workers.dev";
 
-function ss(m){
-  var e=document.getElementById("status");
-  e.textContent=m;
-  e.className="on";
-}
-
-function sc(h){
-  document.getElementById("content").innerHTML=h;
-}
+function ss(m){var e=document.getElementById("status");e.textContent=m;e.className="on";}
+function sc(h){document.getElementById("content").innerHTML=h;}
 
 function sf(b){
   var btns=document.querySelectorAll(".fb");
   for(var i=0;i<btns.length;i++) btns[i].classList.remove("a");
-  b.classList.add("a");
-  fu=b.dataset.f;
+  b.classList.add("a");fu=b.dataset.f;
   if(st.length>0) render();
 }
 
 function sr(b){
   var btns=document.querySelectorAll(".rb");
   for(var i=0;i<btns.length;i++) btns[i].classList.remove("a");
-  b.classList.add("a");
-  ra=parseInt(b.dataset.k);
+  b.classList.add("a");ra=parseInt(b.dataset.k);
   if(la!=null) load();
 }
 
 function hv(a,b,c,d){
-  var R=6371;
-  var dL=(c-a)*Math.PI/180;
-  var dO=(d-b)*Math.PI/180;
+  var R=6371,dL=(c-a)*Math.PI/180,dO=(d-b)*Math.PI/180;
   var x=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dO/2)*Math.sin(dO/2);
   return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
 }
 
 function locate(){
   var btn=document.getElementById("locBtn");
-  btn.disabled=true;
-  btn.textContent="Localisation...";
-  ss("Acces a ta position...");
-  if(!navigator.geolocation){
-    ss("Erreur geolocalisation");
-    btn.disabled=false;
-    btn.textContent="Me localiser";
-    return;
-  }
+  btn.disabled=true;btn.textContent="Localisation...";ss("Acces a ta position...");
+  if(!navigator.geolocation){ss("Erreur geolocalisation");btn.disabled=false;btn.textContent="Me localiser";return;}
   navigator.geolocation.getCurrentPosition(
-    function(p){
-      la=p.coords.latitude;
-      lo=p.coords.longitude;
-      btn.textContent="Actualiser";
-      btn.disabled=false;
-      load();
-    },
-    function(){
-      ss("Erreur - verifie les permissions");
-      btn.disabled=false;
-      btn.textContent="Me localiser";
-    },
+    function(p){la=p.coords.latitude;lo=p.coords.longitude;btn.textContent="Actualiser";btn.disabled=false;load();},
+    function(){ss("Erreur - verifie les permissions");btn.disabled=false;btn.textContent="Me localiser";},
     {enableHighAccuracy:true,timeout:12000}
   );
 }
@@ -149,7 +121,7 @@ function load(){
   ss("Chargement des prix...");
   sc('<div class="empty"><div class="spinner"></div><div style="font-size:14px;color:#e8e8f0">Recherche en cours...</div></div>');
   document.getElementById("stats").className="stats";
-  var url=PROXY+"?lat="+la+"&lon="+lo+"&dist="+(ra*1000)+"&limit=100";
+  var url=PROXY+"?lat="+la+"&lon="+lo+"&limit=100";
   fetch(url).then(function(r){
     if(!r.ok) throw new Error("erreur");
     return r.json();
@@ -163,21 +135,11 @@ function load(){
       var px=parseFloat(r[PK[fu]]);
       var dist=hv(la,lo,rl,rn);
       if(dist<=ra){
-        st.push({
-          id:r.id,
-          adresse:r.adresse||"",
-          ville:r.ville||"",
-          cp:r.cp||"",
-          lat:rl,
-          lon:rn,
-          prix:isNaN(px)?null:px,
-          distance:dist,
-          fuels:Object.keys(PK).filter(function(f){return r[PK[f]]!=null&&r[PK[f]]>0;})
-        });
+        st.push({id:r.id,adresse:r.adresse||"",ville:r.ville||"",cp:r.cp||"",lat:rl,lon:rn,prix:isNaN(px)?null:px,distance:dist,fuels:Object.keys(PK).filter(function(f){return r[PK[f]]!=null&&r[PK[f]]>0;})});
       }
     }
     render();
-  }).catch(function(e){
+  }).catch(function(){
     ss("Erreur - verifie ta connexion");
     sc('<div class="empty"><div style="font-size:30px">!</div><div style="color:#e8e8f0;font-weight:700;margin:8px 0">Erreur</div><div style="font-size:13px">Actualise pour reessayer</div></div>');
   });
@@ -188,34 +150,30 @@ function render(){
   var np=st.filter(function(s){return !s.prix||s.prix<=0;});
   var ps=wp.map(function(s){return s.prix;});
   var ds=wp.map(function(s){return s.distance;});
-  var mnP=Math.min.apply(null,ps);
-  var mxP=Math.max.apply(null,ps);
-  var mnD=Math.min.apply(null,ds);
-  var mxD=Math.max.apply(null,ds);
+  var mnP=Math.min.apply(null,ps),mxP=Math.max.apply(null,ps);
+  var mnD=Math.min.apply(null,ds),mxD=Math.max.apply(null,ds);
   var sc2=wp.map(function(s){
     var nP=mxP===mnP?0:(s.prix-mnP)/(mxP-mnP);
     var nD=mxD===mnD?0:(s.distance-mnD)/(mxD-mnD);
-    var score=Math.round((1-(nP*0.75+nD*0.25))*100);
-    return {id:s.id,adresse:s.adresse,ville:s.ville,cp:s.cp,lat:s.lat,lon:s.lon,prix:s.prix,distance:s.distance,fuels:s.fuels,score:score};
+    return {id:s.id,adresse:s.adresse,ville:s.ville,cp:s.cp,lat:s.lat,lon:s.lon,prix:s.prix,distance:s.distance,score:Math.round((1-(nP*0.75+nD*0.25))*100)};
   });
   sc2.sort(function(a,b){return b.score-a.score;});
-  var all=sc2.concat(np.map(function(s){return {id:s.id,adresse:s.adresse,ville:s.ville,cp:s.cp,lat:s.lat,lon:s.lon,prix:s.prix,distance:s.distance,fuels:s.fuels,score:null};}));
-  
+  var all=sc2.concat(np.map(function(s){return {id:s.id,adresse:s.adresse,ville:s.ville,cp:s.cp,lat:s.lat,lon:s.lon,prix:s.prix,distance:s.distance,score:null};}));
+
   if(all.length===0){
     ss("Aucune station dans "+ra+" km");
     sc('<div class="empty"><div style="font-size:30px">?</div><div style="color:#e8e8f0;font-weight:700;margin:8px 0">Aucune station</div><div style="font-size:13px">Augmente le rayon</div></div>');
     return;
   }
-  
+
   if(ps.length>0){
     document.getElementById("sc").textContent=all.length;
     document.getElementById("sm").textContent=mnP.toFixed(3)+" EUR";
     document.getElementById("sa").textContent=(ps.reduce(function(a,b){return a+b;},0)/ps.length).toFixed(3)+" EUR";
     document.getElementById("stats").className="stats on";
   }
-  
+
   ss(all.length+" stations - "+FL[fu]+" - "+ra+" km OK");
-  
   var html="";
   for(var i=0;i<all.length;i++){
     var s=all[i];
@@ -223,19 +181,19 @@ function render(){
     var dist=s.distance<1?(Math.round(s.distance*1000)+" m"):(s.distance.toFixed(1)+" km");
     var prix=s.prix?(s.prix.toFixed(3)+" EUR"):"N/A";
     var maps="https://www.google.com/maps/dir/?api=1&origin="+la+","+lo+"&destination="+s.lat+","+s.lon+"&travelmode=driving";
-    html+='<div class="card'+(best?" best":"")+'"">';
-    if(best) html+='<div class="badge">MEILLEUR RATIO</div><br>';
-    html+='<div class="rank">#'+(i+1)+(s.score!==null?" - SCORE "+s.score+"/100":"")+'</div>';
-    html+='<div class="name">'+s.adresse+'</div>';
-    html+='<div class="addr">'+s.cp+' '+s.ville+'</div>';
-    html+='<div class="metrics">';
-    html+='<div class="m"><div class="ml">Prix/L</div><div class="mv p">'+prix+'</div></div>';
-    html+='<div class="m"><div class="ml">Distance</div><div class="mv d">'+dist+'</div></div>';
-    html+='<div class="m"><div class="ml">Score</div><div class="mv s">'+(s.score!==null?s.score+"/100":"--")+'</div></div>';
-    html+='</div>';
-    if(s.score!==null) html+='<div class="bar"><div class="fill" style="width:'+s.score+'%"></div></div>';
-    html+='<a class="go" href="'+maps+'" target="_blank">Y aller</a>';
-    html+='</div>';
+    html+='<div class="card'+(best?" best":"")+'">'+
+      (best?'<div class="badge">MEILLEUR RATIO</div><br>':'')+
+      '<div class="rank">#'+(i+1)+(s.score!==null?" - SCORE "+s.score+"/100":"")+'</div>'+
+      '<div class="name">'+s.adresse+'</div>'+
+      '<div class="addr">'+s.cp+' '+s.ville+'</div>'+
+      '<div class="metrics">'+
+      '<div class="m"><div class="ml">Prix/L</div><div class="mv p">'+prix+'</div></div>'+
+      '<div class="m"><div class="ml">Distance</div><div class="mv d">'+dist+'</div></div>'+
+      '<div class="m"><div class="ml">Score</div><div class="mv s">'+(s.score!==null?s.score+"/100":"--")+'</div></div>'+
+      '</div>'+
+      (s.score!==null?'<div class="bar"><div class="fill" style="width:'+s.score+'%"></div></div>':'')+
+      '<a class="go" href="'+maps+'" target="_blank">Y aller</a>'+
+      '</div>';
   }
   sc(html);
 }
