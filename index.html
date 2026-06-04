@@ -121,7 +121,7 @@ function load(){
   ss("Chargement des prix...");
   sc('<div class="empty"><div class="spinner"></div><div style="font-size:14px;color:#e8e8f0">Recherche en cours...</div></div>');
   document.getElementById("stats").className="stats";
-  var URL=PROXY+"?lat="+la+"&lon="+lo+"&dist="+ra+"&limit=100"; 
+  var url=PROXY+"?lat="+la+"&lon="+lo+"&dist="+ra+"&limit=100";
   fetch(url).then(function(r){
     if(!r.ok) throw new Error("erreur");
     return r.json();
@@ -134,9 +134,7 @@ function load(){
       var rn=r.geom?r.geom.lon:parseFloat(r.longitude)/100000;
       var px=parseFloat(r[PK[fu]]);
       var dist=hv(la,lo,rl,rn);
-      if(dist<=ra){
-        st.push({id:r.id,adresse:r.adresse||"",ville:r.ville||"",cp:r.cp||"",lat:rl,lon:rn,prix:isNaN(px)?null:px,distance:dist,fuels:Object.keys(PK).filter(function(f){return r[PK[f]]!=null&&r[PK[f]]>0;})});
-      }
+      st.push({id:r.id,adresse:r.adresse||"",ville:r.ville||"",cp:r.cp||"",lat:rl,lon:rn,prix:isNaN(px)?null:px,distance:dist,fuels:Object.keys(PK).filter(function(f){return r[PK[f]]!=null&&r[PK[f]]>0;})});
     }
     render();
   }).catch(function(){
