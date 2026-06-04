@@ -121,7 +121,7 @@ function load(){
   ss("Chargement des prix...");
   sc('<div class="empty"><div class="spinner"></div><div style="font-size:14px;color:#e8e8f0">Recherche en cours...</div></div>');
   document.getElementById("stats").className="stats";
-  var url=PROXY+"?lat="+la+"&lon="+lo+"&limit=100";
+  var URL=PROXY+"?lat="+la+"&lon="+lo+"&dist="+ra+"&limit=100"; 
   fetch(url).then(function(r){
     if(!r.ok) throw new Error("erreur");
     return r.json();
