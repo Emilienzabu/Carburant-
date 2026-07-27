@@ -36,7 +36,7 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
 .m{background:#0a0a0f;border-radius:8px;padding:8px;text-align:center}
 .ml{font-size:8px;color:#6b6b8a;text-transform:uppercase;margin-bottom:2px}
 .mv{font-size:13px;font-weight:600}
-.mv.p{color:#f5a623}.mv.d{color:#e8e8f0}.mv.s{color:#3ddc97}
+.mv.p{color:#f5a623}.mv.d{color:#e8e8f0}.mv.s{color:#3ddc97}.mv.t{color:#a78bfa}
 .bar{height:4px;background:#0a0a0f;border-radius:4px;overflow:hidden;margin-bottom:10px}
 .fill{height:100%;background:linear-gradient(90deg,#3ddc97,#f5a623)}
 .go{display:block;width:100%;padding:10px;background:#f5a623;color:#000;border:none;border-radius:9px;font-size:13px;font-weight:700;text-align:center;text-decoration:none}
@@ -83,6 +83,7 @@ var la=null,lo=null,fu="Gazole",ra=5,st=[];
 var PK={Gazole:"gazole_prix",SP95:"sp95_prix",SP98:"sp98_prix",E10:"e10_prix",E85:"e85_prix",GPLc:"gplc_prix"};
 var FL={Gazole:"Diesel",SP95:"SP95",SP98:"SP98",E10:"E10",E85:"E85",GPLc:"GPL"};
 var PROXY="https://carburant-proxy.emilienzabukovec09.workers.dev";
+var OSRM="https://router.project-osrm.org/table/v1/driving/";
 
 function ss(m){var e=document.getElementById("status");e.textContent=m;e.className="on";}
 function sc(h){document.getElementById("content").innerHTML=h;}
@@ -105,6 +106,13 @@ function hv(a,b,c,d){
   var R=6371,dL=(c-a)*Math.PI/180,dO=(d-b)*Math.PI/180;
   var x=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dO/2)*Math.sin(dO/2);
   return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+
+function fmtTime(sec){
+  if(sec<60) return sec+"s";
+  var m=Math.round(sec/60);
+  if(m<60) return m+" min";
+  return Math.floor(m/60)+"h"+String(m%60).padStart(2,"0");
 }
 
 function locate(){
@@ -135,12 +143,45 @@ function load(){
       var rn=r.geom?r.geom.lon:parseFloat(r.longitude)/100000;
       var px=parseFloat(r[PK[fu]]);
       var dist=hv(la,lo,rl,rn);
-      st.push({id:r.id,adresse:r.adresse||"",ville:r.ville||"",cp:r.cp||"",lat:rl,lon:rn,prix:isNaN(px)?null:px,distance:dist,fuels:Object.keys(PK).filter(function(f){return r[PK[f]]!=null&&r[PK[f]]>0;})});
+      st.push({id:r.id,adresse:r.adresse||"",ville:r.ville||"",cp:r.cp||"",lat:rl,lon:rn,prix:isNaN(px)?null:px,distance:dist,duree:null});
     }
-    render();
+    // Trier par prix, garder les 10 meilleures avec un prix
+    var avecPrix=st.filter(function(s){return s.prix>0;});
+    avecPrix.sort(function(a,b){return a.prix-b.prix;});
+    var top10=avecPrix.slice(0,10);
+    ss("Calcul des temps de trajet...");
+    fetchOSRM(top10);
   }).catch(function(){
     ss("Erreur - verifie ta connexion");
     sc('<div class="empty"><div style="font-size:30px">!</div><div style="color:#e8e8f0;font-weight:700;margin:8px 0">Erreur</div><div style="font-size:13px">Actualise pour reessayer</div></div>');
+  });
+}
+
+function fetchOSRM(top10){
+  // Construire la requête OSRM table: position + destinations
+  var coords=lo+","+la+";"+top10.map(function(s){return s.lon+","+s.lat;}).join(";");
+  var osrmUrl=OSRM+coords+"?sources=0&annotations=duration,distance";
+  fetch(osrmUrl).then(function(r){return r.json();}).then(function(data){
+    var durations=data.durations?data.durations[0]:null;
+    var distances=data.distances?data.distances[0]:null;
+    for(var i=0;i<top10.length;i++){
+      // index i+1 car source=0 est notre position
+      top10[i].duree=durations?(durations[i+1]||null):null;
+      top10[i].distRoute=distances?(distances[i+1]||null):null;
+    }
+    // Mettre à jour st avec les données OSRM
+    for(var i=0;i<top10.length;i++){
+      for(var j=0;j<st.length;j++){
+        if(st[j].id===top10[i].id){
+          st[j].duree=top10[i].duree;
+          st[j].distRoute=top10[i].distRoute;
+        }
+      }
+    }
+    render();
+  }).catch(function(){
+    // Si OSRM échoue, on affiche quand même les résultats sans temps
+    render();
   });
 }
 
@@ -148,16 +189,26 @@ function render(){
   var wp=st.filter(function(s){return s.prix>0;});
   var np=st.filter(function(s){return !s.prix||s.prix<=0;});
   var ps=wp.map(function(s){return s.prix;});
-  var ds=wp.map(function(s){return s.distance;});
   var mnP=Math.min.apply(null,ps),mxP=Math.max.apply(null,ps);
-  var mnD=Math.min.apply(null,ds),mxD=Math.max.apply(null,ds);
-  var sc2=wp.map(function(s){
+
+  // Pour le score: utiliser duree si dispo, sinon distance vol d'oiseau
+  var ts=wp.map(function(s){return s.duree!==null?s.duree:s.distance*120;});// ~120s/km estimé
+  var mnT=Math.min.apply(null,ts),mxT=Math.max.apply(null,ts);
+
+  var sc2=wp.map(function(s,i){
     var nP=mxP===mnP?0:(s.prix-mnP)/(mxP-mnP);
-    var nD=mxD===mnD?0:(s.distance-mnD)/(mxD-mnD);
-    return {id:s.id,adresse:s.adresse,ville:s.ville,cp:s.cp,lat:s.lat,lon:s.lon,prix:s.prix,distance:s.distance,score:Math.round((1-(nP*0.75+nD*0.25))*100)};
+    var t=s.duree!==null?s.duree:s.distance*120;
+    var nT=mxT===mnT?0:(t-mnT)/(mxT-mnT);
+    return {
+      id:s.id,adresse:s.adresse,ville:s.ville,cp:s.cp,lat:s.lat,lon:s.lon,
+      prix:s.prix,distance:s.distance,duree:s.duree,distRoute:s.distRoute||null,
+      score:Math.round((1-(nP*0.75+nT*0.25))*100)
+    };
   });
   sc2.sort(function(a,b){return b.score-a.score;});
-  var all=sc2.concat(np.map(function(s){return {id:s.id,adresse:s.adresse,ville:s.ville,cp:s.cp,lat:s.lat,lon:s.lon,prix:s.prix,distance:s.distance,score:null};}));
+  var all=sc2.concat(np.map(function(s){
+    return {id:s.id,adresse:s.adresse,ville:s.ville,cp:s.cp,lat:s.lat,lon:s.lon,prix:s.prix,distance:s.distance,duree:null,distRoute:null,score:null};
+  }));
 
   if(all.length===0){
     ss("Aucune station dans "+ra+" km");
@@ -177,7 +228,14 @@ function render(){
   for(var i=0;i<all.length;i++){
     var s=all[i];
     var best=(i===0&&s.score!==null);
-    var dist=s.distance<1?(Math.round(s.distance*1000)+" m"):(s.distance.toFixed(1)+" km");
+    // Distance: routière si dispo, sinon vol d'oiseau
+    var distTxt;
+    if(s.distRoute!==null){
+      distTxt=s.distRoute<1000?(Math.round(s.distRoute)+" m"):(( s.distRoute/1000).toFixed(1)+" km");
+    } else {
+      distTxt=s.distance<1?(Math.round(s.distance*1000)+" m"):(s.distance.toFixed(1)+" km");
+    }
+    var dureeTxt=s.duree!==null?fmtTime(s.duree):"--";
     var prix=s.prix?(s.prix.toFixed(3)+" EUR"):"N/A";
     var maps="https://www.google.com/maps/dir/?api=1&origin="+la+","+lo+"&destination="+s.lat+","+s.lon+"&travelmode=driving";
     html+='<div class="card'+(best?" best":"")+'">'+
@@ -187,8 +245,11 @@ function render(){
       '<div class="addr">'+s.cp+' '+s.ville+'</div>'+
       '<div class="metrics">'+
       '<div class="m"><div class="ml">Prix/L</div><div class="mv p">'+prix+'</div></div>'+
-      '<div class="m"><div class="ml">Distance</div><div class="mv d">'+dist+'</div></div>'+
-      '<div class="m"><div class="ml">Score</div><div class="mv s">'+(s.score!==null?s.score+"/100":"--")+'</div></div>'+
+      '<div class="m"><div class="ml">Distance</div><div class="mv d">'+distTxt+'</div></div>'+
+      '<div class="m"><div class="ml">Temps</div><div class="mv t">'+dureeTxt+'</div></div>'+
+      '</div>'+
+      '<div class="metrics">'+
+      '<div class="m" style="grid-column:span 3"><div class="ml">Score</div><div class="mv s">'+(s.score!==null?s.score+"/100":"--")+'</div></div>'+
       '</div>'+
       (s.score!==null?'<div class="bar"><div class="fill" style="width:'+s.score+'%"></div></div>':'')+
       '<a class="go" href="'+maps+'" target="_blank">Y aller</a>'+
