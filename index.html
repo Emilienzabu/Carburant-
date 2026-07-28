@@ -58,7 +58,6 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
 .side-header{background:#0a0a0f;padding:20px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #252535}
 .side-title{font-size:16px;font-weight:800}
 .close-btn{background:none;border:none;color:#e8e8f0;font-size:22px;cursor:pointer;width:auto;margin:0;padding:4px}
-/* Accordéon */
 .acc-header{display:flex;align-items:center;justify-content:space-between;padding:16px;cursor:pointer;border-bottom:1px solid #252535;user-select:none}
 .acc-title{font-size:13px;font-weight:700;color:#e8e8f0}
 .acc-arrow{font-size:12px;color:#6b6b8a;transition:transform .2s}
@@ -72,6 +71,19 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
 .del-btn{background:none;border:none;color:#ff6b35;font-size:18px;cursor:pointer;width:auto;margin:0;padding:4px}
 .add-btn{width:100%;padding:12px;background:#252535;color:#e8e8f0;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin:0;margin-top:4px}
 .about-box{background:#0a0a0f;border-radius:10px;padding:14px;font-size:13px;color:#6b6b8a;line-height:1.6}
+/* Alertes */
+.alert-box{background:#0a0a0f;border-radius:10px;padding:14px}
+.alert-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.alert-label{font-size:13px;font-weight:700}
+.toggle{position:relative;width:44px;height:24px;cursor:pointer}
+.toggle input{display:none}
+.toggle-track{position:absolute;inset:0;background:#252535;border-radius:12px;transition:background .2s}
+.toggle input:checked+.toggle-track{background:#3ddc97}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:18px;height:18px;background:#fff;border-radius:50%;transition:left .2s}
+.toggle input:checked~.toggle-thumb{left:23px}
+.alert-sub{font-size:11px;color:#6b6b8a;margin-bottom:12px}
+.alert-status{font-size:12px;padding:8px 10px;border-radius:8px;background:#252535;color:#6b6b8a;text-align:center}
+.alert-status.on{background:#1a2e1a;color:#3ddc97}
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:300;align-items:center;justify-content:center}
 .modal.on{display:flex}
 .modal-box{background:#16161f;border-radius:16px;padding:20px;width:90%;max-width:340px}
@@ -96,7 +108,7 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
     <button class="close-btn" onclick="closeMenu()">✕</button>
   </div>
 
-  <!-- Favoris accordéon -->
+  <!-- Favoris -->
   <div class="acc-header" onclick="toggleAcc('favAcc')">
     <div class="acc-title">⭐ Stations favorites</div>
     <div class="acc-arrow" id="favAccArrow">▼</div>
@@ -105,7 +117,7 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
     <div id="favList"><div style="font-size:13px;color:#6b6b8a">Aucun favori pour l'instant</div></div>
   </div>
 
-  <!-- Repères accordéon -->
+  <!-- Repères -->
   <div class="acc-header" onclick="toggleAcc('repAcc')">
     <div class="acc-title">📍 Mes repères</div>
     <div class="acc-arrow" id="repAccArrow">▼</div>
@@ -115,7 +127,27 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
     <button class="add-btn" onclick="openAddRepere()">+ Ajouter un repère</button>
   </div>
 
-  <!-- À propos accordéon -->
+  <!-- Alertes prix -->
+  <div class="acc-header" onclick="toggleAcc('alertAcc')">
+    <div class="acc-title">🔔 Alertes prix</div>
+    <div class="acc-arrow" id="alertAccArrow">▼</div>
+  </div>
+  <div class="acc-body" id="alertAcc">
+    <div class="alert-box">
+      <div class="alert-row">
+        <div class="alert-label">Activer les alertes</div>
+        <label class="toggle">
+          <input type="checkbox" id="alertToggle" onchange="toggleAlert(this.checked)">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+      <div class="alert-sub">Notification à 7h10 si une station avec un prix très bas est détectée près de ton emplacement enregistré.</div>
+      <div class="alert-status" id="alertStatus">Alertes désactivées</div>
+    </div>
+  </div>
+
+  <!-- À propos -->
   <div class="acc-header" onclick="toggleAcc('aboutAcc')">
     <div class="acc-title">ℹ️ À propos</div>
     <div class="acc-arrow" id="aboutAccArrow">▼</div>
@@ -125,6 +157,28 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
       <b style="color:#e8e8f0">CarburantRadar v1.0</b><br>
       Prix en temps réel fournis par le gouvernement français (data.economie.gouv.fr).<br><br>
       Développé par <b style="color:#f5a623">Zabukovec Company</b>
+    </div>
+  </div>
+</div>
+
+<!-- Modal config alertes -->
+<div class="modal" id="alertModal">
+  <div class="modal-box">
+    <div class="modal-title">🔔 Configurer les alertes</div>
+    <div style="font-size:12px;color:#6b6b8a;margin-bottom:8px">Carburant à surveiller</div>
+    <select id="alertCarb" class="modal-input" style="appearance:auto">
+      <option value="Gazole">Diesel</option>
+      <option value="SP95">SP95</option>
+      <option value="SP98">SP98</option>
+      <option value="E10">E10</option>
+      <option value="E85">E85</option>
+      <option value="GPLc">GPL</option>
+    </select>
+    <div style="font-size:12px;color:#6b6b8a;margin-bottom:8px">Emplacement de référence</div>
+    <select id="alertLoc" class="modal-input" style="appearance:auto"></select>
+    <div class="modal-row">
+      <button class="modal-cancel" onclick="closeAlertModal()">Annuler</button>
+      <button class="modal-ok" onclick="confirmAlert()">Activer</button>
     </div>
   </div>
 </div>
@@ -205,7 +259,6 @@ function setReps(v){setLs("cr_reps",v);}
 function sstat(m){var e=document.getElementById("status");e.textContent=m;e.className="on";}
 function scontent(h){document.getElementById("content").innerHTML=h;}
 
-// Accordéon
 function toggleAcc(id){
   var body=document.getElementById(id);
   var arrow=document.getElementById(id+"Arrow");
@@ -215,8 +268,7 @@ function toggleAcc(id){
 }
 
 function openMenu(){
-  renderFavList();
-  renderRepList();
+  renderFavList();renderRepList();updateAlertUI();
   document.getElementById("overlay").classList.add("on");
   document.getElementById("sideMenu").classList.add("on");
 }
@@ -225,10 +277,122 @@ function closeMenu(){
   document.getElementById("sideMenu").classList.remove("on");
 }
 
+// ===== ALERTES PUSH =====
+function updateAlertUI(){
+  var key=getLs("cr_alert_key");
+  var info=getLs("cr_alert_info");
+  var toggle=document.getElementById("alertToggle");
+  var status=document.getElementById("alertStatus");
+  if(key&&info){
+    toggle.checked=true;
+    var reps=getReps();
+    var locName="Position enregistrée";
+    // Chercher si c'est un repère
+    for(var i=0;i<reps.length;i++){
+      if(Math.abs(reps[i].lat-info.lat)<0.0001&&Math.abs(reps[i].lon-info.lon)<0.0001){
+        locName=reps[i].name;break;
+      }
+    }
+    status.textContent="✅ "+FL[info.carburant]+" · "+locName+" · 7h10";
+    status.className="alert-status on";
+  } else {
+    toggle.checked=false;
+    status.textContent="Alertes désactivées";
+    status.className="alert-status";
+  }
+}
+
+function toggleAlert(enabled){
+  if(enabled){
+    activateAlert();
+  } else {
+    deactivateAlert();
+  }
+}
+
+function activateAlert(){
+  // Remplir le select emplacement
+  var reps=getReps();
+  var sel=document.getElementById("alertLoc");
+  sel.innerHTML="";
+  if(la!==null){
+    var opt=document.createElement("option");
+    opt.value="current";opt.textContent="📍 Position actuelle";
+    sel.appendChild(opt);
+  }
+  for(var i=0;i<reps.length;i++){
+    var opt2=document.createElement("option");
+    opt2.value=i;opt2.textContent="📍 "+reps[i].name;
+    sel.appendChild(opt2);
+  }
+  if(sel.options.length===0){
+    alert("Localise-toi ou ajoute un repère d'abord !");
+    document.getElementById("alertToggle").checked=false;
+    return;
+  }
+  // Pré-sélectionner le carburant actuel
+  document.getElementById("alertCarb").value=fu;
+  document.getElementById("alertModal").classList.add("on");
+}
+
+function closeAlertModal(){
+  document.getElementById("alertModal").classList.remove("on");
+  document.getElementById("alertToggle").checked=false;
+}
+
+function confirmAlert(){
+  var carb=document.getElementById("alertCarb").value;
+  var locVal=document.getElementById("alertLoc").value;
+  var lat2,lon2;
+  if(locVal==="current"){lat2=la;lon2=lo;}
+  else{var rep=getReps()[parseInt(locVal)];lat2=rep.lat;lon2=rep.lon;}
+
+  if(!("Notification" in window)){
+    alert("Les notifications ne sont pas supportées sur ce navigateur.");
+    closeAlertModal();return;
+  }
+  Notification.requestPermission().then(function(perm){
+    if(perm!=="granted"){
+      alert("Tu dois autoriser les notifications.");
+      closeAlertModal();return;
+    }
+    fetch(PROXY+"/subscribe",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({lat:lat2,lon:lon2,carburant:carb,names:getNames(),sub:{endpoint:"notif_only"}})
+    }).then(function(r){return r.json();}).then(function(data){
+      if(data.ok){
+        setLs("cr_alert_key",data.key);
+        setLs("cr_alert_info",{carburant:carb,lat:lat2,lon:lon2});
+        document.getElementById("alertModal").classList.remove("on");
+        updateAlertUI();
+      }
+    }).catch(function(){
+      alert("Erreur lors de l'activation.");
+      closeAlertModal();
+    });
+  });
+}
+
+function deactivateAlert(){
+  var key=getLs("cr_alert_key");
+  if(!key){updateAlertUI();return;}
+  fetch(PROXY+"/unsubscribe",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({key:key})
+  }).then(function(){
+    setLs("cr_alert_key",null);
+    updateAlertUI();
+  }).catch(function(){
+    setLs("cr_alert_key",null);
+    updateAlertUI();
+  });
+}
+
+// ===== FAVORIS =====
 function renderFavList(){
-  var favs=getFavs();
-  var names=getNames();
-  var ids=Object.keys(favs);
+  var favs=getFavs();var names=getNames();var ids=Object.keys(favs);
   var el=document.getElementById("favList");
   if(ids.length===0){el.innerHTML='<div style="font-size:13px;color:#6b6b8a">Aucun favori pour l\'instant</div>';return;}
   var html="";
@@ -243,12 +407,11 @@ function renderFavList(){
   }
   el.innerHTML=html;
 }
-
 function removeFav(id){var f=getFavs();delete f[id];setFavs(f);renderFavList();render();}
 
+// ===== REPÈRES =====
 function renderRepList(){
-  var reps=getReps();
-  var el=document.getElementById("repList");
+  var reps=getReps();var el=document.getElementById("repList");
   if(reps.length===0){el.innerHTML='<div style="font-size:13px;color:#6b6b8a">Aucun repère pour l\'instant</div>';return;}
   var html="";
   for(var i=0;i<reps.length;i++){
@@ -260,9 +423,7 @@ function renderRepList(){
   }
   el.innerHTML=html;
 }
-
 function removeRep(i){var r=getReps();r.splice(i,1);setReps(r);renderRepList();}
-
 function openAddRepere(){
   if(la===null){alert("Localise-toi d'abord !");return;}
   document.getElementById("repName").value="";
@@ -277,6 +438,7 @@ function saveRepere(){
   closeRepModal();renderRepList();
 }
 
+// ===== RENOMMAGE =====
 var renameCurrentId=null;
 function openRenameModal(id){
   renameCurrentId=id;
@@ -290,18 +452,23 @@ function saveRename(){
   var nom=document.getElementById("renameInput").value.trim();
   if(nom) setName(renameCurrentId,nom);
   closeRenameModal();render();
+  // Mettre à jour les noms sur le serveur si alertes actives
+  var key=getLs("cr_alert_key");
+  if(key){
+    fetch(PROXY+"/update-names",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({key:key,names:getNames()})
+    }).catch(function(){});
+  }
 }
 
-function closeAllCtx(){
-  var menus=document.querySelectorAll(".ctx-menu");
-  for(var i=0;i<menus.length;i++) menus[i].remove();
-}
+// ===== MENU CONTEXTUEL =====
+function closeAllCtx(){var menus=document.querySelectorAll(".ctx-menu");for(var i=0;i<menus.length;i++)menus[i].remove();}
 function toggleCtx(id,isFavNow){
   closeAllCtx();
-  var card=document.getElementById("card-"+id);
-  if(!card) return;
-  var menu=document.createElement("div");
-  menu.className="ctx-menu";
+  var card=document.getElementById("card-"+id);if(!card)return;
+  var menu=document.createElement("div");menu.className="ctx-menu";
   var favLabel=isFavNow?"⭐ Retirer des favoris":"⭐ Ajouter aux favoris";
   menu.innerHTML='<button class="ctx-item" onclick="openRenameModal(\''+id+'\')">✏️ Renommer</button>'+
     '<div class="ctx-divider"></div>'+
@@ -313,15 +480,13 @@ function doFav(id){toggleFav(id);closeAllCtx();render();renderFavList();}
 
 function sf(b){
   var btns=document.querySelectorAll(".fb");
-  for(var i=0;i<btns.length;i++) btns[i].classList.remove("a");
-  b.classList.add("a");fu=b.dataset.f;
-  if(st.length>0) render();
+  for(var i=0;i<btns.length;i++)btns[i].classList.remove("a");
+  b.classList.add("a");fu=b.dataset.f;if(st.length>0)render();
 }
 function sr(b){
   var btns=document.querySelectorAll(".rb");
-  for(var i=0;i<btns.length;i++) btns[i].classList.remove("a");
-  b.classList.add("a");ra=parseInt(b.dataset.k);
-  if(la!=null) load();
+  for(var i=0;i<btns.length;i++)btns[i].classList.remove("a");
+  b.classList.add("a");ra=parseInt(b.dataset.k);if(la!=null)load();
 }
 
 function hv(a,b,c,d){
@@ -330,9 +495,9 @@ function hv(a,b,c,d){
   return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
 }
 function fmtTime(sec){
-  if(sec<60) return sec+"s";
+  if(sec<60)return sec+"s";
   var m=Math.round(sec/60);
-  if(m<60) return m+" min";
+  if(m<60)return m+" min";
   return Math.floor(m/60)+"h"+String(m%60).padStart(2,"0");
 }
 
@@ -352,11 +517,9 @@ function load(){
   scontent('<div class="empty"><div class="spinner"></div><div style="font-size:14px;color:#e8e8f0">Recherche en cours...</div></div>');
   document.getElementById("stats").className="stats";
   var url=PROXY+"?lat="+la+"&lon="+lo+"&dist="+ra+"&limit=100";
-  fetch(url).then(function(r){
-    if(!r.ok) throw new Error("erreur");
-    return r.json();
-  }).then(function(raw){
-    if(!raw||!Array.isArray(raw.results)) throw new Error("pas de resultats");
+  fetch(url).then(function(r){if(!r.ok)throw new Error("erreur");return r.json();})
+  .then(function(raw){
+    if(!raw||!Array.isArray(raw.results))throw new Error("pas de resultats");
     st=[];
     for(var i=0;i<raw.results.length;i++){
       var r=raw.results[i];
@@ -382,10 +545,7 @@ function fetchOSRM(top10){
   fetch(OSRM+coords+"?sources=0&annotations=duration,distance").then(function(r){return r.json();}).then(function(data){
     var dur=data.durations?data.durations[0]:null;
     var dis=data.distances?data.distances[0]:null;
-    for(var i=0;i<top10.length;i++){
-      top10[i].duree=dur?(dur[i+1]||null):null;
-      top10[i].distRoute=dis?(dis[i+1]||null):null;
-    }
+    for(var i=0;i<top10.length;i++){top10[i].duree=dur?(dur[i+1]||null):null;top10[i].distRoute=dis?(dis[i+1]||null):null;}
     for(var i=0;i<top10.length;i++)
       for(var j=0;j<st.length;j++)
         if(st[j].id===top10[i].id){st[j].duree=top10[i].duree;st[j].distRoute=top10[i].distRoute;}
