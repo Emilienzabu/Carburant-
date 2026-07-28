@@ -2,7 +2,7 @@
   "name": "CarburantRadar",
   "short_name": "CarburantRadar",
   "description": "Trouvez le carburant le moins cher près de vous",
-  "start_url": "/Carburant-/",
+  "start_url": "/CarburantRadar/",
   "display": "standalone",
   "background_color": "#1a1a1f",
   "theme_color": "#f5a623",
