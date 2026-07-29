@@ -6,9 +6,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CarburantRadar</title>
 <meta name="theme-color" content="#f5a623">
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8107840445070854"
-     crossorigin="anonymous"></script>
-<meta name="google-adsense-account" content="ca-pub-8107840445070854">     
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8107840445070854" crossorigin="anonymous"></script>
+<meta name="google-adsense-account" content="ca-pub-8107840445070854">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;color:#e8e8f0;font-family:sans-serif;padding:20px}
@@ -74,7 +73,6 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
 .del-btn{background:none;border:none;color:#ff6b35;font-size:18px;cursor:pointer;width:auto;margin:0;padding:4px}
 .add-btn{width:100%;padding:12px;background:#252535;color:#e8e8f0;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin:0;margin-top:4px}
 .about-box{background:#0a0a0f;border-radius:10px;padding:14px;font-size:13px;color:#6b6b8a;line-height:1.6}
-/* Alertes */
 .alert-box{background:#0a0a0f;border-radius:10px;padding:14px}
 .alert-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .alert-label{font-size:13px;font-weight:700}
@@ -95,9 +93,33 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
 .modal-row{display:flex;gap:8px}
 .modal-cancel{flex:1;padding:10px;background:#252535;color:#e8e8f0;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin:0}
 .modal-ok{flex:1;padding:10px;background:#f5a623;color:#000;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin:0}
+/* Écran de chargement */
+#splash{position:fixed;inset:0;background:#0a0a0f;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s}
+#splash.hide{opacity:0;pointer-events:none}
+.splash-ico{width:80px;height:80px;background:#f5a623;border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:44px;margin-bottom:20px;box-shadow:0 0 40px rgba(245,166,35,0.4);animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 20px rgba(245,166,35,0.3)}50%{box-shadow:0 0 50px rgba(245,166,35,0.7)}}
+.splash-title{font-size:24px;font-weight:800;margin-bottom:4px}
+.splash-title span{color:#f5a623}
+.splash-sub{font-size:12px;color:#6b6b8a;margin-bottom:30px}
+.splash-bar{width:160px;height:3px;background:#252535;border-radius:3px;overflow:hidden}
+.splash-progress{height:100%;background:#f5a623;border-radius:3px;animation:progress 1.5s ease-in-out forwards}
+@keyframes progress{from{width:0}to{width:100%}}
+/* Badge ouvert/fermé */
+.open-badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px;margin-left:6px;vertical-align:middle}
+.open-badge.ouvert{background:#1a2e1a;color:#3ddc97}
+.open-badge.ferme{background:#2e1a1a;color:#ff6b35}
 </style>
 </head>
 <body>
+
+<!-- Écran de chargement -->
+<div id="splash">
+  <div class="splash-ico">⛽</div>
+  <div class="splash-title">Carburant<span>Radar</span></div>
+  <div class="splash-sub">PRIX EN TEMPS RÉEL</div>
+  <div class="splash-bar"><div class="splash-progress"></div></div>
+</div>
+
 <header>
   <div class="ico">⛽</div>
   <div><div class="h1">Carburant<span>Radar</span></div><div class="sub">PRIX EN TEMPS REEL</div></div>
@@ -110,8 +132,6 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
     <div class="side-title">Menu</div>
     <button class="close-btn" onclick="closeMenu()">✕</button>
   </div>
-
-  <!-- Favoris -->
   <div class="acc-header" onclick="toggleAcc('favAcc')">
     <div class="acc-title">⭐ Stations favorites</div>
     <div class="acc-arrow" id="favAccArrow">▼</div>
@@ -119,8 +139,6 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
   <div class="acc-body" id="favAcc">
     <div id="favList"><div style="font-size:13px;color:#6b6b8a">Aucun favori pour l'instant</div></div>
   </div>
-
-  <!-- Repères -->
   <div class="acc-header" onclick="toggleAcc('repAcc')">
     <div class="acc-title">📍 Mes repères</div>
     <div class="acc-arrow" id="repAccArrow">▼</div>
@@ -129,8 +147,6 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
     <div id="repList"><div style="font-size:13px;color:#6b6b8a">Aucun repère pour l'instant</div></div>
     <button class="add-btn" onclick="openAddRepere()">+ Ajouter un repère</button>
   </div>
-
-  <!-- Alertes prix -->
   <div class="acc-header" onclick="toggleAcc('alertAcc')">
     <div class="acc-title">🔔 Alertes prix</div>
     <div class="acc-arrow" id="alertAccArrow">▼</div>
@@ -149,15 +165,13 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
       <div class="alert-status" id="alertStatus">Alertes désactivées</div>
     </div>
   </div>
-
-  <!-- À propos -->
   <div class="acc-header" onclick="toggleAcc('aboutAcc')">
     <div class="acc-title">ℹ️ À propos</div>
     <div class="acc-arrow" id="aboutAccArrow">▼</div>
   </div>
   <div class="acc-body" id="aboutAcc">
     <div class="about-box">
-      <b style="color:#e8e8f0">CarburantRadar v1.0</b><br>
+      <b style="color:#e8e8f0">CarburantRadar v1.1</b><br>
       Prix en temps réel fournis par le gouvernement français (data.economie.gouv.fr).<br><br>
       Développé par <b style="color:#f5a623">Zabukovec Company</b>
     </div>
@@ -247,6 +261,14 @@ var FL={Gazole:"Diesel",SP95:"SP95",SP98:"SP98",E10:"E10",E85:"E85",GPLc:"GPL"};
 var PROXY="https://carburant-proxy.emilienzabukovec09.workers.dev";
 var OSRM="https://router.project-osrm.org/table/v1/driving/";
 
+// Écran de chargement
+window.addEventListener("load",function(){
+  setTimeout(function(){
+    document.getElementById("splash").classList.add("hide");
+    setTimeout(function(){document.getElementById("splash").style.display="none";},500);
+  },1500);
+});
+
 function getLs(k){try{return JSON.parse(localStorage.getItem(k)||"null");}catch(e){return null;}}
 function setLs(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function getFavs(){return getLs("cr_favs")||{};}
@@ -261,6 +283,41 @@ function setReps(v){setLs("cr_reps",v);}
 
 function sstat(m){var e=document.getElementById("status");e.textContent=m;e.className="on";}
 function scontent(h){document.getElementById("content").innerHTML=h;}
+
+// ===== FILTRE HORAIRES =====
+function isOpen(horairesStr){
+  if(!horairesStr) return true; // si pas d'info, on affiche
+  try{
+    var h=typeof horairesStr==="string"?JSON.parse(horairesStr):horairesStr;
+    if(h["@automate-24-24"]==="1") return true; // automate 24h/24
+    var now=new Date();
+    var day=now.getDay(); // 0=dim, 1=lun...
+    var apiDay=day===0?7:day; // API: 1=lun, 7=dim
+    var jours=h.jour;
+    if(!jours) return true;
+    if(!Array.isArray(jours)) jours=[jours];
+    for(var i=0;i<jours.length;i++){
+      if(parseInt(jours[i]["@id"])===apiDay){
+        if(jours[i]["@ferme"]==="1") return false; // fermé ce jour
+        var horaire=jours[i].horaire;
+        if(!horaire) return true; // pas d'horaire précis = ouvert
+        if(!Array.isArray(horaire)) horaire=[horaire];
+        var nowMin=now.getHours()*60+now.getMinutes();
+        for(var j=0;j<horaire.length;j++){
+          var ouv=horaire[j]["@ouverture"];
+          var fer=horaire[j]["@fermeture"];
+          if(ouv&&fer){
+            var ouvMin=parseInt(ouv)*60+parseInt(ouv.split(".")[1]||0);
+            var ferMin=parseInt(fer)*60+parseInt(fer.split(".")[1]||0);
+            if(nowMin>=ouvMin&&nowMin<=ferMin) return true;
+          }
+        }
+        return false;
+      }
+    }
+    return true;
+  }catch(e){return true;}
+}
 
 function toggleAcc(id){
   var body=document.getElementById(id);
@@ -280,7 +337,6 @@ function closeMenu(){
   document.getElementById("sideMenu").classList.remove("on");
 }
 
-// ===== ALERTES PUSH =====
 function updateAlertUI(){
   var key=getLs("cr_alert_key");
   var info=getLs("cr_alert_info");
@@ -290,11 +346,8 @@ function updateAlertUI(){
     toggle.checked=true;
     var reps=getReps();
     var locName="Position enregistrée";
-    // Chercher si c'est un repère
     for(var i=0;i<reps.length;i++){
-      if(Math.abs(reps[i].lat-info.lat)<0.0001&&Math.abs(reps[i].lon-info.lon)<0.0001){
-        locName=reps[i].name;break;
-      }
+      if(Math.abs(reps[i].lat-info.lat)<0.0001&&Math.abs(reps[i].lon-info.lon)<0.0001){locName=reps[i].name;break;}
     }
     status.textContent="✅ "+FL[info.carburant]+" · "+locName+" · 7h10";
     status.className="alert-status on";
@@ -305,95 +358,42 @@ function updateAlertUI(){
   }
 }
 
-function toggleAlert(enabled){
-  if(enabled){
-    activateAlert();
-  } else {
-    deactivateAlert();
-  }
-}
+function toggleAlert(enabled){if(enabled)activateAlert();else deactivateAlert();}
 
 function activateAlert(){
-  // Remplir le select emplacement
   var reps=getReps();
   var sel=document.getElementById("alertLoc");
   sel.innerHTML="";
-  if(la!==null){
-    var opt=document.createElement("option");
-    opt.value="current";opt.textContent="📍 Position actuelle";
-    sel.appendChild(opt);
-  }
-  for(var i=0;i<reps.length;i++){
-    var opt2=document.createElement("option");
-    opt2.value=i;opt2.textContent="📍 "+reps[i].name;
-    sel.appendChild(opt2);
-  }
-  if(sel.options.length===0){
-    alert("Localise-toi ou ajoute un repère d'abord !");
-    document.getElementById("alertToggle").checked=false;
-    return;
-  }
-  // Pré-sélectionner le carburant actuel
+  if(la!==null){var opt=document.createElement("option");opt.value="current";opt.textContent="📍 Position actuelle";sel.appendChild(opt);}
+  for(var i=0;i<reps.length;i++){var opt2=document.createElement("option");opt2.value=i;opt2.textContent="📍 "+reps[i].name;sel.appendChild(opt2);}
+  if(sel.options.length===0){alert("Localise-toi ou ajoute un repère d'abord !");document.getElementById("alertToggle").checked=false;return;}
   document.getElementById("alertCarb").value=fu;
   document.getElementById("alertModal").classList.add("on");
 }
-
-function closeAlertModal(){
-  document.getElementById("alertModal").classList.remove("on");
-  document.getElementById("alertToggle").checked=false;
-}
-
+function closeAlertModal(){document.getElementById("alertModal").classList.remove("on");document.getElementById("alertToggle").checked=false;}
 function confirmAlert(){
   var carb=document.getElementById("alertCarb").value;
   var locVal=document.getElementById("alertLoc").value;
   var lat2,lon2;
   if(locVal==="current"){lat2=la;lon2=lo;}
   else{var rep=getReps()[parseInt(locVal)];lat2=rep.lat;lon2=rep.lon;}
-
-  if(!("Notification" in window)){
-    alert("Les notifications ne sont pas supportées sur ce navigateur.");
-    closeAlertModal();return;
-  }
+  if(!("Notification" in window)){alert("Notifications non supportées.");closeAlertModal();return;}
   Notification.requestPermission().then(function(perm){
-    if(perm!=="granted"){
-      alert("Tu dois autoriser les notifications.");
-      closeAlertModal();return;
-    }
-    fetch(PROXY+"/subscribe",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
+    if(perm!=="granted"){alert("Tu dois autoriser les notifications.");closeAlertModal();return;}
+    fetch(PROXY+"/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({lat:lat2,lon:lon2,carburant:carb,names:getNames(),sub:{endpoint:"notif_only"}})
     }).then(function(r){return r.json();}).then(function(data){
-      if(data.ok){
-        setLs("cr_alert_key",data.key);
-        setLs("cr_alert_info",{carburant:carb,lat:lat2,lon:lon2});
-        document.getElementById("alertModal").classList.remove("on");
-        updateAlertUI();
-      }
-    }).catch(function(){
-      alert("Erreur lors de l'activation.");
-      closeAlertModal();
-    });
+      if(data.ok){setLs("cr_alert_key",data.key);setLs("cr_alert_info",{carburant:carb,lat:lat2,lon:lon2});document.getElementById("alertModal").classList.remove("on");updateAlertUI();}
+    }).catch(function(){alert("Erreur lors de l'activation.");closeAlertModal();});
   });
 }
-
 function deactivateAlert(){
   var key=getLs("cr_alert_key");
   if(!key){updateAlertUI();return;}
-  fetch(PROXY+"/unsubscribe",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({key:key})
-  }).then(function(){
-    setLs("cr_alert_key",null);
-    updateAlertUI();
-  }).catch(function(){
-    setLs("cr_alert_key",null);
-    updateAlertUI();
-  });
+  fetch(PROXY+"/unsubscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:key})})
+  .then(function(){setLs("cr_alert_key",null);updateAlertUI();}).catch(function(){setLs("cr_alert_key",null);updateAlertUI();});
 }
 
-// ===== FAVORIS =====
 function renderFavList(){
   var favs=getFavs();var names=getNames();var ids=Object.keys(favs);
   var el=document.getElementById("favList");
@@ -403,24 +403,20 @@ function renderFavList(){
     var id=ids[i];
     var s=st.find(function(x){return String(x.id)===String(id);});
     var nom=names[id]||(s?(s.adresse+" "+s.ville):"Station #"+id);
-    html+='<div class="side-item"><div class="side-item-row">'+
-      '<div><div class="side-item-name">⭐ '+nom+'</div>'+
-      (s?'<div class="side-item-sub">'+s.cp+' '+s.ville+'</div>':'')+
+    html+='<div class="side-item"><div class="side-item-row"><div><div class="side-item-name">⭐ '+nom+'</div>'+(s?'<div class="side-item-sub">'+s.cp+' '+s.ville+'</div>':'')+
       '</div><button class="del-btn" onclick="removeFav(\''+id+'\')">✕</button></div></div>';
   }
   el.innerHTML=html;
 }
 function removeFav(id){var f=getFavs();delete f[id];setFavs(f);renderFavList();render();}
 
-// ===== REPÈRES =====
 function renderRepList(){
   var reps=getReps();var el=document.getElementById("repList");
   if(reps.length===0){el.innerHTML='<div style="font-size:13px;color:#6b6b8a">Aucun repère pour l\'instant</div>';return;}
   var html="";
   for(var i=0;i<reps.length;i++){
     var r=reps[i];
-    html+='<div class="side-item"><div class="side-item-row">'+
-      '<div><div class="side-item-name">📍 '+r.name+'</div>'+
+    html+='<div class="side-item"><div class="side-item-row"><div><div class="side-item-name">📍 '+r.name+'</div>'+
       '<div class="side-item-sub">'+r.lat.toFixed(4)+', '+r.lon.toFixed(4)+'</div></div>'+
       '<button class="del-btn" onclick="removeRep('+i+')">✕</button></div></div>';
   }
@@ -441,56 +437,32 @@ function saveRepere(){
   closeRepModal();renderRepList();
 }
 
-// ===== RENOMMAGE =====
 var renameCurrentId=null;
-function openRenameModal(id){
-  renameCurrentId=id;
-  document.getElementById("renameInput").value=getName(id)||"";
-  document.getElementById("renameModal").classList.add("on");
-  closeAllCtx();
-}
+function openRenameModal(id){renameCurrentId=id;document.getElementById("renameInput").value=getName(id)||"";document.getElementById("renameModal").classList.add("on");closeAllCtx();}
 function closeRenameModal(){document.getElementById("renameModal").classList.remove("on");renameCurrentId=null;}
 function saveRename(){
   if(!renameCurrentId) return;
   var nom=document.getElementById("renameInput").value.trim();
   if(nom) setName(renameCurrentId,nom);
   closeRenameModal();render();
-  // Mettre à jour les noms sur le serveur si alertes actives
   var key=getLs("cr_alert_key");
-  if(key){
-    fetch(PROXY+"/update-names",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({key:key,names:getNames()})
-    }).catch(function(){});
-  }
+  if(key){fetch(PROXY+"/update-names",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:key,names:getNames()})}).catch(function(){});}
 }
 
-// ===== MENU CONTEXTUEL =====
 function closeAllCtx(){var menus=document.querySelectorAll(".ctx-menu");for(var i=0;i<menus.length;i++)menus[i].remove();}
 function toggleCtx(id,isFavNow){
   closeAllCtx();
   var card=document.getElementById("card-"+id);if(!card)return;
   var menu=document.createElement("div");menu.className="ctx-menu";
   var favLabel=isFavNow?"⭐ Retirer des favoris":"⭐ Ajouter aux favoris";
-  menu.innerHTML='<button class="ctx-item" onclick="openRenameModal(\''+id+'\')">✏️ Renommer</button>'+
-    '<div class="ctx-divider"></div>'+
-    '<button class="ctx-item" onclick="doFav(\''+id+'\')">'+favLabel+'</button>';
+  menu.innerHTML='<button class="ctx-item" onclick="openRenameModal(\''+id+'\')">✏️ Renommer</button><div class="ctx-divider"></div><button class="ctx-item" onclick="doFav(\''+id+'\')">'+favLabel+'</button>';
   card.appendChild(menu);
   setTimeout(function(){document.addEventListener("click",closeAllCtx,{once:true});},10);
 }
 function doFav(id){toggleFav(id);closeAllCtx();render();renderFavList();}
 
-function sf(b){
-  var btns=document.querySelectorAll(".fb");
-  for(var i=0;i<btns.length;i++)btns[i].classList.remove("a");
-  b.classList.add("a");fu=b.dataset.f;if(st.length>0)render();
-}
-function sr(b){
-  var btns=document.querySelectorAll(".rb");
-  for(var i=0;i<btns.length;i++)btns[i].classList.remove("a");
-  b.classList.add("a");ra=parseInt(b.dataset.k);if(la!=null)load();
-}
+function sf(b){var btns=document.querySelectorAll(".fb");for(var i=0;i<btns.length;i++)btns[i].classList.remove("a");b.classList.add("a");fu=b.dataset.f;if(st.length>0)render();}
+function sr(b){var btns=document.querySelectorAll(".rb");for(var i=0;i<btns.length;i++)btns[i].classList.remove("a");b.classList.add("a");ra=parseInt(b.dataset.k);if(la!=null)load();}
 
 function hv(a,b,c,d){
   var R=6371,dL=(c-a)*Math.PI/180,dO=(d-b)*Math.PI/180;
@@ -530,7 +502,10 @@ function load(){
       var rn=r.geom?r.geom.lon:parseFloat(r.longitude)/100000;
       var px=parseFloat(r[PK[fu]]);
       var dist=hv(la,lo,rl,rn);
-      st.push({id:r.id,adresse:r.adresse||"",ville:r.ville||"",cp:r.cp||"",lat:rl,lon:rn,prix:isNaN(px)?null:px,distance:dist,duree:null,distRoute:null});
+      var ouvert=isOpen(r.horaires);
+      // On ne stocke que les stations ouvertes
+      if(!ouvert) continue;
+      st.push({id:r.id,adresse:r.adresse||"",ville:r.ville||"",cp:r.cp||"",lat:rl,lon:rn,prix:isNaN(px)?null:px,distance:dist,duree:null,distRoute:null,automate:r.horaires_automate_24_24==="Oui"});
     }
     var avecPrix=st.filter(function(s){return s.prix>0;});
     avecPrix.sort(function(a,b){return a.prix-b.prix;});
@@ -544,6 +519,7 @@ function load(){
 }
 
 function fetchOSRM(top10){
+  if(top10.length===0){render();return;}
   var coords=lo+","+la+";"+top10.map(function(s){return s.lon+","+s.lat;}).join(";");
   fetch(OSRM+coords+"?sources=0&annotations=duration,distance").then(function(r){return r.json();}).then(function(data){
     var dur=data.durations?data.durations[0]:null;
@@ -569,17 +545,17 @@ function render(){
     var t=s.duree!==null?s.duree:s.distance*120;
     var nT=mxT===mnT?0:(t-mnT)/(mxT-mnT);
     return {id:s.id,adresse:s.adresse,ville:s.ville,cp:s.cp,lat:s.lat,lon:s.lon,
-      prix:s.prix,distance:s.distance,duree:s.duree,distRoute:s.distRoute,
+      prix:s.prix,distance:s.distance,duree:s.duree,distRoute:s.distRoute,automate:s.automate,
       score:Math.round((1-(nP*0.75+nT*0.25))*100)};
   });
   sc2.sort(function(a,b){return b.score-a.score;});
   var all=sc2.concat(np.map(function(s){
     return {id:s.id,adresse:s.adresse,ville:s.ville,cp:s.cp,lat:s.lat,lon:s.lon,
-      prix:s.prix,distance:s.distance,duree:null,distRoute:null,score:null};
+      prix:s.prix,distance:s.distance,duree:null,distRoute:null,automate:s.automate,score:null};
   }));
   if(all.length===0){
-    sstat("Aucune station dans "+ra+" km");
-    scontent('<div class="empty"><div style="font-size:30px">?</div><div style="color:#e8e8f0;font-weight:700;margin:8px 0">Aucune station</div><div style="font-size:13px">Augmente le rayon</div></div>');
+    sstat("Aucune station ouverte dans "+ra+" km");
+    scontent('<div class="empty"><div style="font-size:30px">?</div><div style="color:#e8e8f0;font-weight:700;margin:8px 0">Aucune station ouverte</div><div style="font-size:13px">Augmente le rayon</div></div>');
     return;
   }
   if(ps.length>0){
@@ -588,7 +564,7 @@ function render(){
     document.getElementById("sa").textContent=(ps.reduce(function(a,b){return a+b;},0)/ps.length).toFixed(3)+" EUR";
     document.getElementById("stats").className="stats on";
   }
-  sstat(all.length+" stations - "+FL[fu]+" - "+ra+" km OK");
+  sstat(all.length+" stations ouvertes - "+FL[fu]+" - "+ra+" km");
   var html="";
   for(var i=0;i<all.length;i++){
     var s=all[i];
@@ -599,11 +575,12 @@ function render(){
     var dureeTxt=s.duree!==null?fmtTime(s.duree):"--";
     var prix=s.prix?(s.prix.toFixed(3)+" EUR"):"N/A";
     var maps="https://www.google.com/maps/dir/?api=1&origin="+la+","+lo+"&destination="+s.lat+","+s.lon+"&travelmode=driving";
+    var autoTxt=s.automate?'<span class="open-badge ouvert">24h/24</span>':'';
     html+='<div class="card'+(best?" best":"")+(fav?" fav":"")+'" id="card-'+s.id+'">'+
       (best?'<div class="badge">MEILLEUR RATIO</div><br>':'')+
       '<div class="rank">#'+(i+1)+(s.score!==null?" - SCORE "+s.score+"/100":"")+(fav?" ⭐":"")+'</div>'+
       '<div class="card-header"><div>'+
-        '<div class="name">'+(nomPerso||s.adresse)+'</div>'+
+        '<div class="name">'+(nomPerso||s.adresse)+autoTxt+'</div>'+
         (nomPerso?'<div class="addr">'+s.adresse+'</div>':'<div class="addr">'+s.cp+' '+s.ville+'</div>')+
       '</div><button class="dots-btn" onclick="toggleCtx(\''+s.id+'\','+fav+');event.stopPropagation()">⋮</button></div>'+
       '<div class="metrics">'+
