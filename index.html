@@ -527,54 +527,120 @@ function lancerTrajet(){
   var champPrix=PK[carb];
   var btn=document.getElementById("trajetBtn");
   btn.textContent="Recherche en cours...";btn.disabled=true;
-  document.getElementById("trajetResult").innerHTML='<div class="empty"><div class="spinner"></div><div style="font-size:13px;color:#e8e8f0">Recherche des stations...</div></div>';
+  var res=document.getElementById("trajetResult");
+  res.innerHTML='<div class="empty"><div class="spinner"></div><div style="font-size:13px;color:#e8e8f0">Géocodage de la destination...</div></div>';
 
-  // Chercher stations dans 20km autour de la position
-  fetch(PROXY+"?lat="+la+"&lon="+lo+"&dist=20").then(function(r){return r.json();})
-  .then(function(raw){
-    if(!raw||!Array.isArray(raw.results))throw new Error();
-    var stations=raw.results.filter(function(r){
-      var px=parseFloat(r[champPrix]);
-      return !isNaN(px)&&px>0&&isOpen(r.horaires);
-    }).map(function(r){
-      var rl=r.geom?r.geom.lat:parseFloat(r.latitude)/100000;
-      var rn=r.geom?r.geom.lon:parseFloat(r.longitude)/100000;
-      return {id:r.id,adresse:r.adresse||"",ville:r.ville||"",cp:r.cp||"",lat:rl,lon:rn,prix:parseFloat(r[champPrix])};
+  // Étape 1 : Géocoder la destination avec Nominatim
+  fetch("https://nominatim.openstreetmap.org/search?q="+encodeURIComponent(dest)+"&countrycodes=fr&limit=1&format=json",{headers:{"Accept-Language":"fr"}})
+  .then(function(r){return r.json();})
+  .then(function(geo){
+    if(!geo||!geo.length) throw new Error("dest_not_found");
+    var dLat=parseFloat(geo[0].lat),dLon=parseFloat(geo[0].lon);
+    res.innerHTML='<div class="empty"><div class="spinner"></div><div style="font-size:13px;color:#e8e8f0">Calcul du trajet direct...</div></div>';
+
+    // Étape 2 : Trajet direct A→B via OSRM route
+    return fetch("https://router.project-osrm.org/route/v1/driving/"+lo+","+la+";"+dLon+","+dLat+"?overview=false")
+    .then(function(r){return r.json();})
+    .then(function(route){
+      var dureeDirecte=route.routes[0].duration; // secondes
+      res.innerHTML='<div class="empty"><div class="spinner"></div><div style="font-size:13px;color:#e8e8f0">Recherche des stations...</div></div>';
+
+      // Étape 3 : Chercher stations le long du trajet
+      // On cherche dans un rayon = distance directe * 0.3 autour du point médian
+      var midLat=(la+dLat)/2,midLon=(lo+dLon)/2;
+      var distKm=hv(la,lo,dLat,dLon);
+      var rayon=Math.max(15,Math.min(distKm*0.6,80)); // entre 15 et 80km
+
+      return fetch(PROXY+"?lat="+midLat+"&lon="+midLon+"&dist="+rayon)
+      .then(function(r){return r.json();})
+      .then(function(raw){
+        if(!raw||!Array.isArray(raw.results))throw new Error();
+        var stations=raw.results.filter(function(r){
+          var px=parseFloat(r[champPrix]);
+          return !isNaN(px)&&px>0&&isOpen(r.horaires);
+        }).map(function(r){
+          var rl=r.geom?r.geom.lat:parseFloat(r.latitude)/100000;
+          var rn=r.geom?r.geom.lon:parseFloat(r.longitude)/100000;
+          return {id:r.id,adresse:r.adresse||"",ville:r.ville||"",cp:r.cp||"",lat:rl,lon:rn,prix:parseFloat(r[champPrix])};
+        });
+        if(!stations.length) throw new Error("no_stations");
+
+        res.innerHTML='<div class="empty"><div class="spinner"></div><div style="font-size:13px;color:#e8e8f0">Calcul des détours...</div></div>';
+
+        // Étape 4 : Calculer le détour pour chaque station via OSRM table
+        // On prend les 15 moins chères pour limiter les requêtes
+        stations.sort(function(a,b){return a.prix-b.prix;});
+        var candidats=stations.slice(0,15);
+
+        // OSRM route pour chaque station : A→S→B
+        var promises=candidats.map(function(s){
+          return fetch("https://router.project-osrm.org/route/v1/driving/"+lo+","+la+";"+s.lon+","+s.lat+";"+dLon+","+dLat+"?overview=false")
+          .then(function(r){return r.json();})
+          .then(function(data){
+            s.dureeAvec=data.routes[0].duration;
+            s.detour=s.dureeAvec-dureeDirecte; // secondes de détour
+            return s;
+          }).catch(function(){s.dureeAvec=null;s.detour=null;return s;});
+        });
+
+        return Promise.all(promises).then(function(candidats){
+          // Étape 5 : Score combiné
+          // Prix normalisé (80%) + détour normalisé (20%)
+          // Pénalité détour exponentielle : plus le détour est long, plus il faut que le prix compense
+          var avecDetour=candidats.filter(function(s){return s.detour!==null;});
+          if(!avecDetour.length) avecDetour=candidats;
+
+          var mnP=Math.min.apply(null,avecDetour.map(function(s){return s.prix;}));
+          var mxP=Math.max.apply(null,avecDetour.map(function(s){return s.prix;}));
+          var mnD=Math.min.apply(null,avecDetour.filter(function(s){return s.detour!==null;}).map(function(s){return s.detour;})||[0]);
+          var mxD=Math.max.apply(null,avecDetour.filter(function(s){return s.detour!==null;}).map(function(s){return s.detour;})||[1]);
+
+          avecDetour.forEach(function(s){
+            var nP=mxP===mnP?0:(s.prix-mnP)/(mxP-mnP);
+            var nD=s.detour!==null?(mxD===mnD?0:(s.detour-mnD)/(mxD-mnD)):0.5;
+            s.score=Math.round((1-(nP*0.8+nD*0.2))*100);
+          });
+
+          avecDetour.sort(function(a,b){return b.score-a.score;});
+          var best=avecDetour[0];
+          var names=getNames();
+          var nom=names[String(best.id)]||best.adresse;
+          var detourMin=best.detour!==null?Math.round(best.detour/60):null;
+          var dureeAvecMin=best.dureeAvec!==null?Math.round(best.dureeAvec/60):null;
+          var dureeDirecteMin=Math.round(dureeDirecte/60);
+
+          var mapsUrl="https://www.google.com/maps/dir/?api=1"+
+            "&origin="+la+","+lo+
+            "&waypoints="+best.lat+","+best.lon+
+            "&destination="+encodeURIComponent(dest)+
+            "&travelmode=driving";
+
+          res.innerHTML=
+            '<div class="card best" style="margin-top:16px">'+
+            '<div class="badge">MEILLEURE STATION SUR LA ROUTE</div><br>'+
+            '<div class="name">'+nom+'</div>'+
+            '<div class="addr">'+best.cp+' '+best.ville+'</div>'+
+            '<div class="metrics" style="margin-top:10px">'+
+              '<div class="m"><div class="ml">Prix/L</div><div class="mv p">'+best.prix.toFixed(3)+' €</div></div>'+
+              '<div class="m"><div class="ml">Détour</div><div class="mv t">'+(detourMin!==null?(detourMin<=1?"Aucun":"+"+detourMin+" min"):"--")+'</div></div>'+
+              '<div class="m"><div class="ml">Durée totale</div><div class="mv d">'+(dureeAvecMin!==null?dureeAvecMin+" min":"--")+'</div></div>'+
+            '</div>'+
+            '<div style="font-size:11px;color:#6b6b8a;text-align:center;margin-bottom:10px">Trajet direct : '+dureeDirecteMin+' min · Score : '+best.score+'/100</div>'+
+            '<a class="go" href="'+mapsUrl+'" target="_blank">🧭 Ouvrir l\'itinéraire complet</a>'+
+            '</div>';
+
+          btn.textContent="Trouver la meilleure station";btn.disabled=false;
+        });
+      });
     });
-    if(!stations.length){
-      document.getElementById("trajetResult").innerHTML='<div class="empty"><div style="font-size:30px">?</div><div style="color:#e8e8f0;font-weight:700;margin:8px 0">Aucune station trouvée</div></div>';
-      btn.textContent="Trouver la meilleure station";btn.disabled=false;return;
+  }).catch(function(e){
+    if(e.message==="dest_not_found"){
+      res.innerHTML='<div class="empty"><div style="color:#e8e8f0;font-weight:700;margin:8px 0">Destination introuvable</div><div style="font-size:13px">Essaie avec une adresse plus précise</div></div>';
+    } else if(e.message==="no_stations"){
+      res.innerHTML='<div class="empty"><div style="color:#e8e8f0;font-weight:700;margin:8px 0">Aucune station trouvée</div><div style="font-size:13px">Essaie une destination plus lointaine</div></div>';
+    } else {
+      res.innerHTML='<div class="empty"><div style="color:#e8e8f0;font-weight:700">Erreur - vérifie ta connexion</div></div>';
     }
-    // Trier par prix, prendre top 5
-    stations.sort(function(a,b){return a.prix-b.prix;});
-    var top5=stations.slice(0,5);
-    // Trouver la meilleure : la moins chère parmi les 5 (déjà triées)
-    var best=top5[0];
-    var names=getNames();
-    var nom=names[String(best.id)]||best.adresse;
-    var mapsUrl="https://www.google.com/maps/dir/?api=1"+
-      "&origin="+la+","+lo+
-      "&waypoints="+best.lat+","+best.lon+
-      "&destination="+encodeURIComponent(dest)+
-      "&travelmode=driving";
-
-    document.getElementById("trajetResult").innerHTML=
-      '<div class="card best" style="margin-top:16px">'+
-      '<div class="badge">MEILLEURE STATION SUR LA ROUTE</div><br>'+
-      '<div class="name">'+nom+'</div>'+
-      '<div class="addr">'+best.cp+' '+best.ville+'</div>'+
-      '<div class="metrics" style="margin-top:10px">'+
-        '<div class="m"><div class="ml">Prix/L</div><div class="mv p">'+best.prix.toFixed(3)+' EUR</div></div>'+
-        '<div class="m"><div class="ml">Carburant</div><div class="mv d">'+FL[carb]+'</div></div>'+
-        '<div class="m"><div class="ml">Destination</div><div class="mv t" style="font-size:10px">'+dest+'</div></div>'+
-      '</div>'+
-      '<a class="go" href="'+mapsUrl+'" target="_blank">🧭 Ouvrir l\'itinéraire</a>'+
-      '</div>'+
-      '<div style="font-size:11px;color:#6b6b8a;text-align:center;margin-top:8px">Itinéraire : Ta position → Station → '+dest+'</div>';
-
-    btn.textContent="Trouver la meilleure station";btn.disabled=false;
-  }).catch(function(){
-    document.getElementById("trajetResult").innerHTML='<div class="empty"><div style="color:#e8e8f0;font-weight:700">Erreur - vérifie ta connexion</div></div>';
     btn.textContent="Trouver la meilleure station";btn.disabled=false;
   });
 }
