@@ -598,7 +598,8 @@ function lancerTrajet(){
           avecDetour.forEach(function(s){
             var nP=mxP===mnP?0:(s.prix-mnP)/(mxP-mnP);
             var nD=s.detour!==null?(mxD===mnD?0:(s.detour-mnD)/(mxD-mnD)):0.5;
-            s.score=Math.round((1-(nP*0.8+nD*0.2))*100);
+            var penalite=nD*nD; // pénalité exponentielle : détour long = très pénalisé
+s.score=Math.round((1-(nP*0.75+penalite*0.25))*100);
           });
 
           avecDetour.sort(function(a,b){return b.score-a.score;});
