@@ -19,7 +19,7 @@ header{background:#16161f;border-bottom:1px solid #252535;padding:16px;display:f
 .sub{font-size:10px;color:#6b6b8a}
 .menu-btn{width:36px;height:36px;background:none;border:none;color:#e8e8f0;font-size:22px;cursor:pointer;margin-left:auto;padding:0;display:flex;align-items:center;justify-content:center}
 /* Barre navigation bas */
-.nav-bar{position:fixed;bottom:0;left:0;right:0;background:#16161f;border-top:1px solid #252535;display:flex;z-index:1000;height:60px}
+.nav-bar{position:fixed;bottom:0;left:0;right:0;background:#16161f;border-top:1px solid #252535;display:flex;z-index:100;height:60px}
 .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:none;border:none;color:#6b6b8a;font-size:10px;cursor:pointer;padding:8px 0;margin:0;border-radius:0;gap:3px}
 .nav-btn.active{color:#f5a623}
 .nav-btn span{font-size:20px;line-height:1}
@@ -29,7 +29,7 @@ header{background:#16161f;border-bottom:1px solid #252535;padding:16px;display:f
 #page-map{display:none;padding:0}
 #page-map.active{display:block}
 /* Carte */
-#map{height:calc(100vh - 130px);width:100%;position:relative;z-index:1}
+#map{height:calc(100vh - 120px);width:100%}
 /* Boutons */
 button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px}
 .fuels,.radii{display:flex;gap:4px;background:#16161f;border:1px solid #252535;border-radius:10px;padding:4px;margin-bottom:10px;overflow-x:auto}
@@ -158,7 +158,6 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
 <!-- Page Carte -->
 <div class="page" id="page-map">
   <div id="map"></div>
-<button onclick="showPage('radar')" style="position:absolute;top:70px;right:10px;z-index:500;width:auto;padding:8px 14px;border-radius:20px;font-size:12px;background:#16161f;color:#e8e8f0;border:1px solid #252535;margin:0">⛽ Radar</button>
 </div>
 
 <!-- Page Radar -->
@@ -195,12 +194,28 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
   </div>
 </div>
 
-<!-- Page Trajet (à venir) -->
+<!-- Page Trajet -->
 <div class="page" id="page-trajet">
-  <div class="empty" style="padding-top:80px">
-    <div style="font-size:40px;margin-bottom:10px">🧭</div>
-    <div style="font-size:16px;font-weight:700;color:#e8e8f0;margin-bottom:6px">Mode Trajet</div>
-    <div style="font-size:13px">Bientôt disponible !</div>
+  <div style="padding:20px">
+    <div style="font-size:16px;font-weight:800;margin-bottom:4px">🧭 Mode Trajet</div>
+    <div style="font-size:12px;color:#6b6b8a;margin-bottom:16px">Trouve la meilleure station sur ta route</div>
+
+    <div style="font-size:12px;color:#6b6b8a;margin-bottom:6px">Destination</div>
+    <input id="trajetDest" class="modal-input" placeholder="Ex: 13100 Aix-en-Provence" style="margin-bottom:12px">
+
+    <div style="font-size:12px;color:#6b6b8a;margin-bottom:6px">Carburant</div>
+    <select id="trajetCarb" class="modal-input" style="appearance:auto;margin-bottom:16px">
+      <option value="Gazole">Diesel</option>
+      <option value="SP95">SP95</option>
+      <option value="SP98">SP98</option>
+      <option value="E10">E10</option>
+      <option value="E85">E85</option>
+      <option value="GPLc">GPL</option>
+    </select>
+
+    <button onclick="lancerTrajet()" id="trajetBtn">Trouver la meilleure station</button>
+
+    <div id="trajetResult"></div>
   </div>
 </div>
 
@@ -319,6 +334,7 @@ function showPage(name){
   document.getElementById("page-"+name).classList.add("active");
   document.getElementById("nav-"+name).classList.add("active");
   if(name==="map") initMap();
+  if(name==="trajet") initTrajetPage();
 }
 
 function initMap(){
@@ -494,6 +510,74 @@ function toggleCtx(id,fav){
 }
 function doFav(id){toggleFav(id);closeAllCtx();render();renderFavList();}
 function sf(b){document.querySelectorAll(".fb").forEach(function(x){x.classList.remove("a");});b.classList.add("a");fu=b.dataset.f;if(st.length)render();}
+
+// ===== MODE TRAJET =====
+function initTrajetPage(){
+  // Pré-sélectionner le carburant des alertes
+  var info=getLs("cr_alert_info");
+  if(info&&info.carburant) document.getElementById("trajetCarb").value=info.carburant;
+  else document.getElementById("trajetCarb").value=fu;
+}
+
+function lancerTrajet(){
+  if(la===null){alert("Localise-toi d'abord dans l'onglet Radar !");return;}
+  var dest=document.getElementById("trajetDest").value.trim();
+  if(!dest){alert("Entre une destination !");return;}
+  var carb=document.getElementById("trajetCarb").value;
+  var champPrix=PK[carb];
+  var btn=document.getElementById("trajetBtn");
+  btn.textContent="Recherche en cours...";btn.disabled=true;
+  document.getElementById("trajetResult").innerHTML='<div class="empty"><div class="spinner"></div><div style="font-size:13px;color:#e8e8f0">Recherche des stations...</div></div>';
+
+  // Chercher stations dans 20km autour de la position
+  fetch(PROXY+"?lat="+la+"&lon="+lo+"&dist=20").then(function(r){return r.json();})
+  .then(function(raw){
+    if(!raw||!Array.isArray(raw.results))throw new Error();
+    var stations=raw.results.filter(function(r){
+      var px=parseFloat(r[champPrix]);
+      return !isNaN(px)&&px>0&&isOpen(r.horaires);
+    }).map(function(r){
+      var rl=r.geom?r.geom.lat:parseFloat(r.latitude)/100000;
+      var rn=r.geom?r.geom.lon:parseFloat(r.longitude)/100000;
+      return {id:r.id,adresse:r.adresse||"",ville:r.ville||"",cp:r.cp||"",lat:rl,lon:rn,prix:parseFloat(r[champPrix])};
+    });
+    if(!stations.length){
+      document.getElementById("trajetResult").innerHTML='<div class="empty"><div style="font-size:30px">?</div><div style="color:#e8e8f0;font-weight:700;margin:8px 0">Aucune station trouvée</div></div>';
+      btn.textContent="Trouver la meilleure station";btn.disabled=false;return;
+    }
+    // Trier par prix, prendre top 5
+    stations.sort(function(a,b){return a.prix-b.prix;});
+    var top5=stations.slice(0,5);
+    // Trouver la meilleure : la moins chère parmi les 5 (déjà triées)
+    var best=top5[0];
+    var names=getNames();
+    var nom=names[String(best.id)]||best.adresse;
+    var mapsUrl="https://www.google.com/maps/dir/?api=1"+
+      "&origin="+la+","+lo+
+      "&waypoints="+best.lat+","+best.lon+
+      "&destination="+encodeURIComponent(dest)+
+      "&travelmode=driving";
+
+    document.getElementById("trajetResult").innerHTML=
+      '<div class="card best" style="margin-top:16px">'+
+      '<div class="badge">MEILLEURE STATION SUR LA ROUTE</div><br>'+
+      '<div class="name">'+nom+'</div>'+
+      '<div class="addr">'+best.cp+' '+best.ville+'</div>'+
+      '<div class="metrics" style="margin-top:10px">'+
+        '<div class="m"><div class="ml">Prix/L</div><div class="mv p">'+best.prix.toFixed(3)+' EUR</div></div>'+
+        '<div class="m"><div class="ml">Carburant</div><div class="mv d">'+FL[carb]+'</div></div>'+
+        '<div class="m"><div class="ml">Destination</div><div class="mv t" style="font-size:10px">'+dest+'</div></div>'+
+      '</div>'+
+      '<a class="go" href="'+mapsUrl+'" target="_blank">🧭 Ouvrir l\'itinéraire</a>'+
+      '</div>'+
+      '<div style="font-size:11px;color:#6b6b8a;text-align:center;margin-top:8px">Itinéraire : Ta position → Station → '+dest+'</div>';
+
+    btn.textContent="Trouver la meilleure station";btn.disabled=false;
+  }).catch(function(){
+    document.getElementById("trajetResult").innerHTML='<div class="empty"><div style="color:#e8e8f0;font-weight:700">Erreur - vérifie ta connexion</div></div>';
+    btn.textContent="Trouver la meilleure station";btn.disabled=false;
+  });
+}
 function sr(b){document.querySelectorAll(".rb").forEach(function(x){x.classList.remove("a");});b.classList.add("a");ra=parseInt(b.dataset.k);if(la!=null)load();}
 function hv(a,b,c,d){var R=6371,dL=(c-a)*Math.PI/180,dO=(d-b)*Math.PI/180;var x=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dO/2)*Math.sin(dO/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
 function fmtTime(sec){if(sec<60)return sec+"s";var m=Math.round(sec/60);if(m<60)return m+" min";return Math.floor(m/60)+"h"+String(m%60).padStart(2,"0");}
