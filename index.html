@@ -426,7 +426,7 @@ function load(){
     st=[];
     raw.results.forEach(function(r){
       var rl=r.geom?r.geom.lat:parseFloat(r.latitude)/100000,rn=r.geom?r.geom.lon:parseFloat(r.longitude)/100000,px=parseFloat(r[PK[fu]]);
-      if(!isOpen(r.horaires))return;
+      if(r.horaires_automate_24_24==="Oui"||isOpen(r.horaires)) {} else return;
       st.push({id:r.id,adresse:r.adresse||"",ville:r.ville||"",cp:r.cp||"",lat:rl,lon:rn,prix:isNaN(px)?null:px,distance:hv(la,lo,rl,rn),duree:null,distRoute:null,automate:r.horaires_automate_24_24==="Oui"});
     });
     var top10=st.filter(function(s){return s.prix>0;}).sort(function(a,b){return a.prix-b.prix;}).slice(0,10);
