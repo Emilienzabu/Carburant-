@@ -103,6 +103,9 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
 .modal-row{display:flex;gap:8px}
 .modal-cancel{flex:1;padding:10px;background:#252535;color:#e8e8f0;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin:0}
 .modal-ok{flex:1;padding:10px;background:#f5a623;color:#000;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin:0}
+.suggest-item{padding:10px 12px;font-size:13px;color:#e8e8f0;cursor:pointer;border-bottom:1px solid #1a1a2a}
+.suggest-item:last-child{border-bottom:none}
+.suggest-item:hover{background:#16161f}
 .open-badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px;margin-left:6px;vertical-align:middle;background:#1a2e1a;color:#3ddc97}
 #splash{position:fixed;inset:0;background:#0a0a0f;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s}
 #splash.hide{opacity:0;pointer-events:none}
@@ -176,7 +179,10 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
     <div style="font-size:16px;font-weight:800;margin-bottom:4px">🧭 Mode Trajet</div>
     <div style="font-size:12px;color:#6b6b8a;margin-bottom:16px">Trouve la meilleure station sur ta route</div>
     <div style="font-size:12px;color:#6b6b8a;margin-bottom:6px">Destination</div>
-    <input id="trajetDest" class="modal-input" placeholder="Ex: 13100 Aix-en-Provence" style="margin-bottom:12px">
+    <div style="position:relative;margin-bottom:12px">
+      <input id="trajetDest" class="modal-input" placeholder="Ex: Aix-en-Provence, 13100..." style="margin-bottom:0" oninput="autocomplete()" autocomplete="off">
+      <div id="suggestions" style="display:none;position:absolute;left:0;right:0;top:100%;background:#252535;border-radius:0 0 8px 8px;z-index:100;max-height:200px;overflow-y:auto;border:1px solid #3a3a4a;border-top:none"></div>
+    </div>
     <div style="font-size:12px;color:#6b6b8a;margin-bottom:6px">Carburant</div>
     <select id="trajetCarb" class="modal-input" style="appearance:auto;margin-bottom:16px">
       <option value="Gazole">Diesel</option>
@@ -212,7 +218,7 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
   </div>
   <div class="acc-header" onclick="toggleAcc('aboutAcc')"><div class="acc-title">ℹ️ À propos</div><div class="acc-arrow" id="aboutAccArrow">▼</div></div>
   <div class="acc-body" id="aboutAcc">
-    <div class="about-box"><b style="color:#e8e8f0">CarburantRadar v1.1</b><br>Prix en temps réel fournis par le gouvernement français (data.economie.gouv.fr).<br><br>Si vous souhaitez avoir des renseignements, veuillez me contacter à cette adresse: emilienzabukovec09@gmail.com<br><br>Développé par <b style="color:#f5a623">Emilien Zabukovec</b></div>
+    <div class="about-box"><b style="color:#e8e8f0">CarburantRadar v1.1</b><br>Prix en temps réel fournis par le gouvernement français (data.economie.gouv.fr).<br><br>Développé par <b style="color:#f5a623">Zabukovec Company</b></div>
   </div>
 </div>
 <div class="modal" id="alertModal">
@@ -483,6 +489,38 @@ function render(){
       '<a class="go" href="'+maps+'" target="_blank">Y aller</a></div>';
   }).join(""));
 }
+
+// ===== AUTOCOMPLÉTION =====
+var autocompleteTimer=null;
+function autocomplete(){
+  clearTimeout(autocompleteTimer);
+  var val=document.getElementById("trajetDest").value.trim();
+  var sug=document.getElementById("suggestions");
+  if(val.length<3){sug.style.display="none";return;}
+  autocompleteTimer=setTimeout(function(){
+    fetch("https://nominatim.openstreetmap.org/search?q="+encodeURIComponent(val)+"&countrycodes=fr&limit=5&format=json",{headers:{"Accept-Language":"fr"}})
+    .then(function(r){return r.json();})
+    .then(function(results){
+      if(!results||!results.length){sug.style.display="none";return;}
+      sug.innerHTML=results.map(function(r){
+        var nom=r.display_name.split(",").slice(0,3).join(", ");
+        return '<div class="suggest-item" onclick="selectSuggest(''+nom.replace(/'/g,"\'")+'')">'+ nom+'</div>';
+      }).join("");
+      sug.style.display="block";
+    }).catch(function(){sug.style.display="none";});
+  },400);
+}
+function selectSuggest(nom){
+  document.getElementById("trajetDest").value=nom;
+  document.getElementById("suggestions").style.display="none";
+}
+// Fermer suggestions si clic ailleurs
+document.addEventListener("click",function(e){
+  if(!e.target.closest("#trajetDest")&&!e.target.closest("#suggestions")){
+    var sug=document.getElementById("suggestions");
+    if(sug)sug.style.display="none";
+  }
+});
 
 // ===== MODE TRAJET =====
 function initTrajetPage(){
