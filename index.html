@@ -8,8 +8,24 @@
 <meta name="theme-color" content="#f5a623">
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8107840445070854" crossorigin="anonymous"></script>
 <meta name="google-adsense-account" content="ca-pub-8107840445070854">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+function initMap(){
+  if(mapInit){if(la&&map)map.setView([la,lo],13);updateMapMarkers();return;}
+  // Charger Leaflet à la demande
+  if(!window.L){
+    var link=document.createElement("link");link.rel="stylesheet";link.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";document.head.appendChild(link);
+    var script=document.createElement("script");script.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.onload=function(){initMapCore();};document.head.appendChild(script);
+    return;
+  }
+  initMapCore();
+}
+function initMapCore(){
+  mapInit=true;
+  map=L.map("map").setView([46.6,2.3],6);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap",maxZoom:19}).addTo(map);
+  if(la){map.setView([la,lo],13);addUserMarker();}
+  updateMapMarkers();
+}
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;color:#e8e8f0;font-family:sans-serif;padding-bottom:70px}
