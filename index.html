@@ -212,7 +212,7 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
   </div>
   <div class="acc-header" onclick="toggleAcc('aboutAcc')"><div class="acc-title">ℹ️ À propos</div><div class="acc-arrow" id="aboutAccArrow">▼</div></div>
   <div class="acc-body" id="aboutAcc">
-    <div class="about-box"><b style="color:#e8e8f0">CarburantRadar v1.1</b><br>Prix en temps réel fournis par le gouvernement français (data.economie.gouv.fr).<br><br>Si vous souhaitez avoir des renseignements, veuillez me contacter à cette adresses: emilienzabukovec09@gmail.com<br><br>Développé par <b style="color:#f5a623">Emilien Zabukovec</b></div>
+    <div class="about-box"><b style="color:#e8e8f0">CarburantRadar v1.1</b><br>Prix en temps réel fournis par le gouvernement français (data.economie.gouv.fr).<br><br>Si vous souhaitez avoir des renseignements, veuillez me contacter à cette adresse: emilienzabukovec09@gmail.com<br><br>Développé par <b style="color:#f5a623">Emilien Zabukovec</b></div>
   </div>
 </div>
 <div class="modal" id="alertModal">
@@ -243,7 +243,7 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
   </div>
 </div>
 <script>
-var la=null,lo=null,fu="Gazole",ra=5,st=[];
+var la=null,lo=null,fu=localStorage.getItem("cr_fu")||"Gazole",ra=parseInt(localStorage.getItem("cr_ra")||"5"),st=[];
 var PK={Gazole:"gazole_prix",SP95:"sp95_prix",SP98:"sp98_prix",E10:"e10_prix",E85:"e85_prix",GPLc:"gplc_prix"};
 var FL={Gazole:"Diesel",SP95:"SP95",SP98:"SP98",E10:"E10",E85:"E85",GPLc:"GPL"};
 var PROXY="https://carburant-proxy.emilienzabukovec09.workers.dev";
@@ -251,6 +251,10 @@ var OSRM="https://router.project-osrm.org/table/v1/driving/";
 var map=null,mapInit=false,userMarker=null,stationMarkers=[];
 
 window.addEventListener("load",function(){
+  // Appliquer carburant mémorisé
+  document.querySelectorAll(".fb").forEach(function(b){b.classList.remove("a");if(b.dataset.f===fu)b.classList.add("a");});
+  // Appliquer rayon mémorisé
+  document.querySelectorAll(".rb").forEach(function(b){b.classList.remove("a");if(parseInt(b.dataset.k)===ra)b.classList.add("a");});
   setTimeout(function(){document.getElementById("splash").classList.add("hide");setTimeout(function(){document.getElementById("splash").style.display="none";},500);},1500);
 });
 
@@ -403,8 +407,8 @@ function toggleCtx(id,fav){
   card.appendChild(menu);setTimeout(function(){document.addEventListener("click",closeAllCtx,{once:true});},10);
 }
 function doFav(id){toggleFav(id);closeAllCtx();render();renderFavList();}
-function sf(b){document.querySelectorAll(".fb").forEach(function(x){x.classList.remove("a");});b.classList.add("a");fu=b.dataset.f;if(st.length)render();}
-function sr(b){document.querySelectorAll(".rb").forEach(function(x){x.classList.remove("a");});b.classList.add("a");ra=parseInt(b.dataset.k);if(la!=null)load();}
+function sf(b){document.querySelectorAll(".fb").forEach(function(x){x.classList.remove("a");});b.classList.add("a");fu=b.dataset.f;localStorage.setItem("cr_fu",fu);if(st.length)render();}
+function sr(b){document.querySelectorAll(".rb").forEach(function(x){x.classList.remove("a");});b.classList.add("a");ra=parseInt(b.dataset.k);localStorage.setItem("cr_ra",ra);if(la!=null)load();}
 function hv(a,b,c,d){var R=6371,dL=(c-a)*Math.PI/180,dO=(d-b)*Math.PI/180;var x=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dO/2)*Math.sin(dO/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
 function fmtTime(sec){if(sec<60)return sec+"s";var m=Math.round(sec/60);if(m<60)return m+" min";return Math.floor(m/60)+"h"+String(m%60).padStart(2,"0");}
 
@@ -426,7 +430,7 @@ function load(){
     st=[];
     raw.results.forEach(function(r){
       var rl=r.geom?r.geom.lat:parseFloat(r.latitude)/100000,rn=r.geom?r.geom.lon:parseFloat(r.longitude)/100000,px=parseFloat(r[PK[fu]]);
-      if(r.horaires_automate_24_24==="Oui"||isOpen(r.horaires)) {} else return;
+      if(!isOpen(r.horaires))return;
       st.push({id:r.id,adresse:r.adresse||"",ville:r.ville||"",cp:r.cp||"",lat:rl,lon:rn,prix:isNaN(px)?null:px,distance:hv(la,lo,rl,rn),duree:null,distRoute:null,automate:r.horaires_automate_24_24==="Oui"});
     });
     var top10=st.filter(function(s){return s.prix>0;}).sort(function(a,b){return a.prix-b.prix;}).slice(0,10);
@@ -510,20 +514,24 @@ function lancerTrajet(){
       var dureeDirecte=route.routes[0].duration;
       res.innerHTML='<div class="empty"><div class="spinner"></div><div style="font-size:13px;color:#e8e8f0">Recherche des stations...</div></div>';
 
-      // Étape 3 : Stations autour du point médian
-      var midLat=(la+dLat)/2,midLon=(lo+dLon)/2;
+      // Étape 3 : Stations autour de 3 points du trajet (départ, milieu, destination)
       var distKm=hv(la,lo,dLat,dLon);
-      var rayon=Math.max(15,Math.min(distKm*0.6,80));
+      var rayonPt=Math.max(10,Math.min(distKm*0.3,40));
+      var pts=[{lat:la,lon:lo},{lat:(la+dLat)/2,lon:(lo+dLon)/2},{lat:dLat,lon:dLon}];
 
-      return fetch(PROXY+"?lat="+midLat+"&lon="+midLon+"&dist="+rayon)
-      .then(function(r){return r.json();})
-      .then(function(raw){
-        if(!raw||!Array.isArray(raw.results))throw new Error();
-        var stations=raw.results.filter(function(r){
-          var px=parseFloat(r[champPrix]);return !isNaN(px)&&px>0&&isOpen(r.horaires);
-        }).map(function(r){
-          var rl=r.geom?r.geom.lat:parseFloat(r.latitude)/100000,rn=r.geom?r.geom.lon:parseFloat(r.longitude)/100000;
-          return {id:r.id,adresse:r.adresse||"",ville:r.ville||"",cp:r.cp||"",lat:rl,lon:rn,prix:parseFloat(r[champPrix])};
+      return Promise.all(pts.map(function(pt){
+        return fetch(PROXY+"?lat="+pt.lat+"&lon="+pt.lon+"&dist="+rayonPt).then(function(r){return r.json();}).catch(function(){return {results:[]};});
+      })).then(function(results){
+        var seen={},stations=[];
+        results.forEach(function(raw){
+          if(!raw||!Array.isArray(raw.results))return;
+          raw.results.forEach(function(r){
+            if(seen[r.id])return;seen[r.id]=true;
+            var px=parseFloat(r[champPrix]);
+            if(isNaN(px)||px<=0||!isOpen(r.horaires))return;
+            var rl=r.geom?r.geom.lat:parseFloat(r.latitude)/100000,rn=r.geom?r.geom.lon:parseFloat(r.longitude)/100000;
+            stations.push({id:r.id,adresse:r.adresse||"",ville:r.ville||"",cp:r.cp||"",lat:rl,lon:rn,prix:px});
+          });
         });
         if(!stations.length)throw new Error("no_stations");
 
@@ -561,6 +569,8 @@ function lancerTrajet(){
           var best=avecDetour[0];
           var names=getNames(),nom=names[String(best.id)]||best.adresse;
           var detourMin=best.detour!==null?Math.round(best.detour/60):null;
+          var avertissement=detourMin!==null&&detourMin>10?'<div style="background:#2e1a0a;border:1px solid #f5a623;border-radius:8px;padding:8px 10px;font-size:11px;color:#f5a623;margin-bottom:10px">⚠️ Aucune station idéale trouvée. Meilleure option disponible (+'+detourMin+' min).</div>':"";
+          var avertissement=detourMin!==null&&detourMin>10?'<div style="background:#2e1a0a;border:1px solid #f5a623;border-radius:8px;padding:8px 10px;font-size:11px;color:#f5a623;margin-bottom:10px">⚠️ Aucune station idéale trouvée sur ce trajet. Meilleure option disponible (+'+detourMin+' min).</div>':"";
           var dureeAvecMin=best.dureeAvec!==null?Math.round(best.dureeAvec/60):null;
           var dureeDirecteMin=Math.round(dureeDirecte/60);
 
@@ -569,6 +579,7 @@ function lancerTrajet(){
           res.innerHTML=
             '<div class="card best" style="margin-top:16px">'+
             '<div class="badge">MEILLEURE STATION SUR LA ROUTE</div><br>'+
+            avertissement+
             '<div class="name">'+nom+'</div>'+
             '<div class="addr">'+best.cp+' '+best.ville+'</div>'+
             '<div class="metrics" style="margin-top:10px">'+
@@ -582,6 +593,8 @@ function lancerTrajet(){
 
           btn.textContent="Trouver la meilleure station";btn.disabled=false;
         });
+      });
+      });
       });
     });
   }).catch(function(e){
