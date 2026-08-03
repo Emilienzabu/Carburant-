@@ -8,24 +8,6 @@
 <meta name="theme-color" content="#f5a623">
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8107840445070854" crossorigin="anonymous"></script>
 <meta name="google-adsense-account" content="ca-pub-8107840445070854">
-function initMap(){
-  if(mapInit){if(la&&map)map.setView([la,lo],13);updateMapMarkers();return;}
-  // Charger Leaflet à la demande
-  if(!window.L){
-    var link=document.createElement("link");link.rel="stylesheet";link.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";document.head.appendChild(link);
-    var script=document.createElement("script");script.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-    script.onload=function(){initMapCore();};document.head.appendChild(script);
-    return;
-  }
-  initMapCore();
-}
-function initMapCore(){
-  mapInit=true;
-  map=L.map("map").setView([46.6,2.3],6);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap",maxZoom:19}).addTo(map);
-  if(la){map.setView([la,lo],13);addUserMarker();}
-  updateMapMarkers();
-}
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0f;color:#e8e8f0;font-family:sans-serif;padding-bottom:70px}
@@ -234,7 +216,7 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
   </div>
   <div class="acc-header" onclick="toggleAcc('aboutAcc')"><div class="acc-title">ℹ️ À propos</div><div class="acc-arrow" id="aboutAccArrow">▼</div></div>
   <div class="acc-body" id="aboutAcc">
-    <div class="about-box"><b style="color:#e8e8f0">CarburantRadar v1.1</b><br>Prix en temps réel fournis par le gouvernement français (data.economie.gouv.fr).<br><br>Développé par <b style="color:#f5a623">Zabukovec Company</b></div>
+    <div class="about-box"><b style="color:#e8e8f0">CarburantRadar v1.1</b><br>Prix en temps réel fournis par le gouvernement français (data.economie.gouv.fr).<br><br>Si vous souhaitez avoir des renseignements, veuillez me contacter à cette adresse: emilienzabukovec09@gmail.com<br><br>Développé par <b style="color:#f5a623">Emilien Zabukovec</b></div>
   </div>
 </div>
 <div class="modal" id="alertModal">
@@ -272,12 +254,16 @@ var PROXY="https://carburant-proxy.emilienzabukovec09.workers.dev";
 var OSRM="https://router.project-osrm.org/table/v1/driving/";
 var map=null,mapInit=false,userMarker=null,stationMarkers=[];
 
+// Filet de sécurité : splash disparaît après 3s max
+setTimeout(function(){var s=document.getElementById("splash");if(s)s.style.display="none";},3000);
+
 window.addEventListener("load",function(){
-  // Appliquer carburant mémorisé
   document.querySelectorAll(".fb").forEach(function(b){b.classList.remove("a");if(b.dataset.f===fu)b.classList.add("a");});
-  // Appliquer rayon mémorisé
   document.querySelectorAll(".rb").forEach(function(b){b.classList.remove("a");if(parseInt(b.dataset.k)===ra)b.classList.add("a");});
-  setTimeout(function(){document.getElementById("splash").classList.add("hide");setTimeout(function(){document.getElementById("splash").style.display="none";},500);},1500);
+  setTimeout(function(){
+    document.getElementById("splash").classList.add("hide");
+    setTimeout(function(){document.getElementById("splash").style.display="none";},500);
+  },800);
 });
 
 function showPage(name){
@@ -291,6 +277,15 @@ function showPage(name){
 
 function initMap(){
   if(mapInit){if(la&&map)map.setView([la,lo],13);updateMapMarkers();return;}
+  if(!window.L){
+    var link=document.createElement("link");link.rel="stylesheet";link.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";document.head.appendChild(link);
+    var script=document.createElement("script");script.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.onload=function(){initMapCore();};document.head.appendChild(script);
+    return;
+  }
+  initMapCore();
+}
+function initMapCore(){
   mapInit=true;
   map=L.map("map").setView([46.6,2.3],6);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap",maxZoom:19}).addTo(map);
@@ -452,7 +447,7 @@ function load(){
     st=[];
     raw.results.forEach(function(r){
       var rl=r.geom?r.geom.lat:parseFloat(r.latitude)/100000,rn=r.geom?r.geom.lon:parseFloat(r.longitude)/100000,px=parseFloat(r[PK[fu]]);
-      if(!isOpen(r.horaires))return;
+      if(r.horaires_automate_24_24==="Oui"||isOpen(r.horaires)){}else return;
       st.push({id:r.id,adresse:r.adresse||"",ville:r.ville||"",cp:r.cp||"",lat:rl,lon:rn,prix:isNaN(px)?null:px,distance:hv(la,lo,rl,rn),duree:null,distRoute:null,automate:r.horaires_automate_24_24==="Oui"});
     });
     var top10=st.filter(function(s){return s.prix>0;}).sort(function(a,b){return a.prix-b.prix;}).slice(0,10);
@@ -520,7 +515,7 @@ function autocomplete(){
       if(!results||!results.length){sug.style.display="none";return;}
       sug.innerHTML=results.map(function(r){
         var nom=r.display_name.split(",").slice(0,3).join(", ");
-        return '<div class="suggest-item" onclick="selectSuggest(''+nom.replace(/'/g,"\'")+'')">'+ nom+'</div>';
+        return '<div class="suggest-item" onclick="selectSuggest(this.dataset.nom)" data-nom="'+nom.replace(/"/g,"&quot;")+'">'+nom+'</div>';
       }).join("");
       sug.style.display="block";
     }).catch(function(){sug.style.display="none";});
@@ -530,9 +525,8 @@ function selectSuggest(nom){
   document.getElementById("trajetDest").value=nom;
   document.getElementById("suggestions").style.display="none";
 }
-// Fermer suggestions si clic ailleurs
 document.addEventListener("click",function(e){
-  if(!e.target.closest("#trajetDest")&&!e.target.closest("#suggestions")){
+  if(!e.target.closest||(!e.target.closest("#trajetDest")&&!e.target.closest("#suggestions"))){
     var sug=document.getElementById("suggestions");
     if(sug)sug.style.display="none";
   }
@@ -553,7 +547,6 @@ function lancerTrajet(){
   btn.textContent="Recherche en cours...";btn.disabled=true;
   res.innerHTML='<div class="empty"><div class="spinner"></div><div style="font-size:13px;color:#e8e8f0">Géocodage de la destination...</div></div>';
 
-  // Étape 1 : Géocoder
   fetch("https://nominatim.openstreetmap.org/search?q="+encodeURIComponent(dest)+"&countrycodes=fr&limit=1&format=json",{headers:{"Accept-Language":"fr"}})
   .then(function(r){return r.json();})
   .then(function(geo){
@@ -561,14 +554,12 @@ function lancerTrajet(){
     var dLat=parseFloat(geo[0].lat),dLon=parseFloat(geo[0].lon);
     res.innerHTML='<div class="empty"><div class="spinner"></div><div style="font-size:13px;color:#e8e8f0">Calcul du trajet direct...</div></div>';
 
-    // Étape 2 : Trajet direct
     return fetch("https://router.project-osrm.org/route/v1/driving/"+lo+","+la+";"+dLon+","+dLat+"?overview=false")
     .then(function(r){return r.json();})
     .then(function(route){
       var dureeDirecte=route.routes[0].duration;
       res.innerHTML='<div class="empty"><div class="spinner"></div><div style="font-size:13px;color:#e8e8f0">Recherche des stations...</div></div>';
 
-      // Étape 3 : Stations autour de 3 points du trajet (départ, milieu, destination)
       var distKm=hv(la,lo,dLat,dLon);
       var rayonPt=Math.max(10,Math.min(distKm*0.3,40));
       var pts=[{lat:la,lon:lo},{lat:(la+dLat)/2,lon:(lo+dLon)/2},{lat:dLat,lon:dLon}];
@@ -590,48 +581,40 @@ function lancerTrajet(){
         if(!stations.length)throw new Error("no_stations");
 
         res.innerHTML='<div class="empty"><div class="spinner"></div><div style="font-size:13px;color:#e8e8f0">Calcul des détours...</div></div>';
-
-        // Étape 4 : Top 15 moins chères → calcul détour
         stations.sort(function(a,b){return a.prix-b.prix;});
         var candidats=stations.slice(0,15);
 
-        var promises=candidats.map(function(s){
+        return Promise.all(candidats.map(function(s){
           return fetch("https://router.project-osrm.org/route/v1/driving/"+lo+","+la+";"+s.lon+","+s.lat+";"+dLon+","+dLat+"?overview=false")
           .then(function(r){return r.json();})
           .then(function(data){s.dureeAvec=data.routes[0].duration;s.detour=s.dureeAvec-dureeDirecte;return s;})
           .catch(function(){s.dureeAvec=null;s.detour=null;return s;});
-        });
-
-        return Promise.all(promises).then(function(candidats){
+        })).then(function(candidats){
           var avecDetour=candidats.filter(function(s){return s.detour!==null;});
           if(!avecDetour.length)avecDetour=candidats;
 
           var mnP=Math.min.apply(null,avecDetour.map(function(s){return s.prix;}));
           var mxP=Math.max.apply(null,avecDetour.map(function(s){return s.prix;}));
           var detours=avecDetour.filter(function(s){return s.detour!==null;}).map(function(s){return s.detour;});
-          var mnD=Math.min.apply(null,detours||[0]),mxD=Math.max.apply(null,detours||[1]);
+          var mnD=detours.length?Math.min.apply(null,detours):0;
+          var mxD=detours.length?Math.max.apply(null,detours):1;
 
           avecDetour.forEach(function(s){
             var nP=mxP===mnP?0:(s.prix-mnP)/(mxP-mnP);
             var nD=s.detour!==null?(mxD===mnD?0:(s.detour-mnD)/(mxD-mnD)):0.5;
-            // Pénalité cubique sur le détour : privilégie FORTEMENT les stations sans détour
-            var penaliteDetour=nD*nD*nD;
-            s.score=Math.round((1-(nP*0.25+penaliteDetour*0.75))*100);
+            s.score=Math.round((1-(nP*0.25+nD*nD*nD*0.75))*100);
           });
-
           avecDetour.sort(function(a,b){return b.score-a.score;});
+
           var best=avecDetour[0];
           var names=getNames(),nom=names[String(best.id)]||best.adresse;
           var detourMin=best.detour!==null?Math.round(best.detour/60):null;
-          var avertissement=detourMin!==null&&detourMin>10?'<div style="background:#2e1a0a;border:1px solid #f5a623;border-radius:8px;padding:8px 10px;font-size:11px;color:#f5a623;margin-bottom:10px">⚠️ Aucune station idéale trouvée. Meilleure option disponible (+'+detourMin+' min).</div>':"";
-          var avertissement=detourMin!==null&&detourMin>10?'<div style="background:#2e1a0a;border:1px solid #f5a623;border-radius:8px;padding:8px 10px;font-size:11px;color:#f5a623;margin-bottom:10px">⚠️ Aucune station idéale trouvée sur ce trajet. Meilleure option disponible (+'+detourMin+' min).</div>':"";
           var dureeAvecMin=best.dureeAvec!==null?Math.round(best.dureeAvec/60):null;
           var dureeDirecteMin=Math.round(dureeDirecte/60);
-
+          var avertissement=detourMin!==null&&detourMin>10?'<div style="background:#2e1a0a;border:1px solid #f5a623;border-radius:8px;padding:8px 10px;font-size:11px;color:#f5a623;margin-bottom:10px">⚠️ Aucune station idéale trouvée sur ce trajet. Meilleure option disponible (+'+detourMin+' min).</div>':"";
           var mapsUrl="https://www.google.com/maps/dir/?api=1&origin="+la+","+lo+"&waypoints="+best.lat+","+best.lon+"&destination="+encodeURIComponent(dest)+"&travelmode=driving";
 
-          res.innerHTML=
-            '<div class="card best" style="margin-top:16px">'+
+          res.innerHTML='<div class="card best" style="margin-top:16px">'+
             '<div class="badge">MEILLEURE STATION SUR LA ROUTE</div><br>'+
             avertissement+
             '<div class="name">'+nom+'</div>'+
@@ -644,11 +627,8 @@ function lancerTrajet(){
             '<div style="font-size:11px;color:#6b6b8a;text-align:center;margin-bottom:10px">Trajet direct : '+dureeDirecteMin+' min · Score : '+best.score+'/100</div>'+
             '<a class="go" href="'+mapsUrl+'" target="_blank">🧭 Ouvrir l\'itinéraire complet</a>'+
             '</div>';
-
           btn.textContent="Trouver la meilleure station";btn.disabled=false;
         });
-      });
-      });
       });
     });
   }).catch(function(e){
