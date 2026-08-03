@@ -101,6 +101,13 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
 .modal-row{display:flex;gap:8px}
 .modal-cancel{flex:1;padding:10px;background:#252535;color:#e8e8f0;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin:0}
 .modal-ok{flex:1;padding:10px;background:#f5a623;color:#000;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin:0}
+/* Analyse */
+.indic{background:#16161f;border:1px solid #252535;border-radius:10px;padding:10px;text-align:center}
+.indic-label{font-size:8px;color:#6b6b8a;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.indic-val{font-size:15px;font-weight:800}
+.indic-val.pos{color:#3ddc97}
+.indic-val.neg{color:#ff6b35}
+.indic-val.neu{color:#e8e8f0}
 .suggest-item{padding:10px 12px;font-size:13px;color:#e8e8f0;cursor:pointer;border-bottom:1px solid #1a1a2a}
 .suggest-item:last-child{border-bottom:none}
 .suggest-item:hover{background:#16161f}
@@ -138,6 +145,7 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
   <button class="nav-btn" id="nav-map" onclick="showPage('map')"><span>🗺️</span>Carte</button>
   <button class="nav-btn active" id="nav-radar" onclick="showPage('radar')"><span>⛽</span>Radar</button>
   <button class="nav-btn" id="nav-trajet" onclick="showPage('trajet')"><span>🧭</span>Trajet</button>
+  <button class="nav-btn" id="nav-analyse" onclick="showPage('analyse')"><span>📊</span>Analyse</button>
 </div>
 <div class="page" id="page-map"><div id="map"></div></div>
 <div class="page active" id="page-radar">
@@ -194,6 +202,34 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
     <div id="trajetResult"></div>
   </div>
 </div>
+<!-- Page Analyse -->
+<div class="page" id="page-analyse">
+  <div style="padding:20px">
+    <div style="font-size:16px;font-weight:800;margin-bottom:4px">📊 Analyse des prix</div>
+    <div style="font-size:12px;color:#6b6b8a;margin-bottom:16px">Évolution du prix vs moyenne zone</div>
+    <div id="analyseStation" style="background:#16161f;border:1px solid #252535;border-radius:10px;padding:12px;margin-bottom:12px;display:none">
+      <div style="font-size:11px;color:#6b6b8a;margin-bottom:4px">STATION ANALYSÉE</div>
+      <div id="analyseNom" style="font-size:14px;font-weight:700"></div>
+      <div id="analyseAddr" style="font-size:11px;color:#6b6b8a"></div>
+    </div>
+    <div id="analyseEmpty" style="text-align:center;padding:30px 0;color:#6b6b8a;font-size:13px">Appuie sur ⋮ sur une station puis "Analyser"</div>
+    <!-- Sélecteur période -->
+    <div id="analysePeriodes" style="display:none;flex;gap:4px;background:#16161f;border:1px solid #252535;border-radius:10px;padding:4px;margin-bottom:16px;overflow-x:auto">
+      <button class="rb a" data-p="7" onclick="setPeriode(this)">7 jours</button>
+      <button class="rb" data-p="30" onclick="setPeriode(this)">1 mois</button>
+      <button class="rb" data-p="90" onclick="setPeriode(this)">3 mois</button>
+      <button class="rb" data-p="365" onclick="setPeriode(this)">1 an</button>
+    </div>
+    <!-- Indicateurs -->
+    <div id="analyseIndicateurs" style="display:none;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px"></div>
+    <!-- Graphique -->
+    <div id="analyseGraphContainer" style="display:none;background:#16161f;border:1px solid #252535;border-radius:14px;padding:16px;margin-bottom:16px">
+      <canvas id="analyseGraph" height="200"></canvas>
+    </div>
+    <div id="analyseLoading" style="display:none;text-align:center;padding:30px 0"><div class="spinner" style="margin:0 auto 10px"></div><div style="font-size:13px;color:#6b6b8a">Chargement de l'historique...</div></div>
+  </div>
+</div>
+
 <div class="overlay" id="overlay" onclick="closeMenu()"></div>
 <div class="side-menu" id="sideMenu">
   <div class="side-header"><div class="side-title">Menu</div><button class="close-btn" onclick="closeMenu()">✕</button></div>
@@ -273,6 +309,7 @@ function showPage(name){
   document.getElementById("nav-"+name).classList.add("active");
   if(name==="map") initMap();
   if(name==="trajet") initTrajetPage();
+  if(name==="analyse"&&analyseStationData) chargerAnalyse();
 }
 
 function initMap(){
@@ -638,6 +675,210 @@ function lancerTrajet(){
     res.innerHTML='<div class="empty">'+msg+'</div>';
     btn.textContent="Trouver la meilleure station";btn.disabled=false;
   });
+}
+
+// ===== ANALYSE =====
+var analyseStationId=null,analysePeriode=7,analyseStationData=null;
+
+function ouvrirAnalyse(id){
+  closeAllCtx();
+  var s=st.find(function(x){return String(x.id)===String(id);});
+  if(!s){alert("Station introuvable dans les résultats actuels.");return;}
+  analyseStationData=s;
+  analyseStationId=id;
+  showPage('analyse');
+  // Afficher info station
+  var names=getNames();
+  document.getElementById("analyseNom").textContent=names[String(id)]||s.adresse;
+  document.getElementById("analyseAddr").textContent=s.cp+" "+s.ville;
+  document.getElementById("analyseStation").style.display="block";
+  document.getElementById("analyseEmpty").style.display="none";
+  document.getElementById("analysePeriodes").style.display="flex";document.getElementById("analysePeriodes").style.flexWrap="nowrap";document.getElementById("analysePeriodes").style.overflowX="auto";
+  chargerAnalyse();
+}
+
+function setPeriode(b){
+  document.querySelectorAll("#analysePeriodes .rb").forEach(function(x){x.classList.remove("a");});
+  b.classList.add("a");
+  analysePeriode=parseInt(b.dataset.p);
+  chargerAnalyse();
+}
+
+function chargerAnalyse(){
+  if(!analyseStationData)return;
+  document.getElementById("analyseLoading").style.display="block";
+  document.getElementById("analyseGraphContainer").style.display="none";
+  document.getElementById("analyseIndicateurs").style.display="none";
+
+  var s=analyseStationData;
+  var dateDebut=new Date();
+  dateDebut.setDate(dateDebut.getDate()-analysePeriode);
+  var dateStr=dateDebut.toISOString().split("T")[0];
+
+  // API historique J-1 gouvernement
+  var stationUrl="https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-j-1/records?limit=100&where=id%3D"+s.id+"%20AND%20date%3E%3D%22"+dateStr+"%22&order_by=date%20ASC";
+  var moyUrl="https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-j-1/records?limit=100&where=within_distance(geom%2Cgeom'POINT("+s.lon+"%20"+s.lat+")',10000m)%20AND%20date%3E%3D%22"+dateStr+"%22&order_by=date%20ASC";
+
+  Promise.all([fetch(stationUrl).then(function(r){return r.json();}), fetch(moyUrl).then(function(r){return r.json();})])
+  .then(function(results){
+    var stationRaw=results[0],moyRaw=results[1];
+    var champPrix=PK[fu];
+
+    // Parser les prix de la station par date
+    var stationPrix={};
+    if(stationRaw&&stationRaw.results){
+      stationRaw.results.forEach(function(r){
+        var d=r.date?r.date.split("T")[0]:null;
+        var p=parseFloat(r[champPrix]);
+        if(d&&!isNaN(p)&&p>0) stationPrix[d]=p;
+      });
+    }
+
+    // Parser les prix moyens par date
+    var moyPrix={};
+    if(moyRaw&&moyRaw.results){
+      var parDate={};
+      moyRaw.results.forEach(function(r){
+        var d=r.date?r.date.split("T")[0]:null;
+        var p=parseFloat(r[champPrix]);
+        if(d&&!isNaN(p)&&p>0){
+          if(!parDate[d])parDate[d]=[];
+          parDate[d].push(p);
+        }
+      });
+      Object.keys(parDate).forEach(function(d){
+        var arr=parDate[d];
+        moyPrix[d]=arr.reduce(function(a,b){return a+b;},0)/arr.length;
+      });
+    }
+
+    // Construire les séries sur la période
+    var dates=[],serieStation=[],serieMoy=[];
+    var d=new Date(dateStr);
+    var fin=new Date();
+    while(d<=fin){
+      var ds=d.toISOString().split("T")[0];
+      dates.push(ds);
+      serieStation.push(stationPrix[ds]||null);
+      serieMoy.push(moyPrix[ds]||null);
+      d.setDate(d.getDate()+1);
+    }
+
+    // Calcul indicateurs
+    var stValid=serieStation.filter(function(x){return x!==null;});
+    var moyValid=serieMoy.filter(function(x){return x!==null;});
+    var dernierPrix=stValid.length?stValid[stValid.length-1]:null;
+    var premierPrix=stValid.length?stValid[0]:null;
+    var variation=dernierPrix&&premierPrix?((dernierPrix-premierPrix)/premierPrix*100):null;
+    var moyGlobal=moyValid.length?(moyValid.reduce(function(a,b){return a+b;},0)/moyValid.length):null;
+    var ecartMoy=dernierPrix&&moyGlobal?((dernierPrix-moyGlobal)/moyGlobal*100):null;
+    var minPrix=stValid.length?Math.min.apply(null,stValid):null;
+    var maxPrix=stValid.length?Math.max.apply(null,stValid):null;
+
+    // Afficher indicateurs
+    var indHtml='<div class="indic"><div class="indic-label">Prix actuel</div><div class="indic-val neu">'+(dernierPrix?dernierPrix.toFixed(3)+"€":"--")+'</div></div>'+
+      '<div class="indic"><div class="indic-label">Variation période</div><div class="indic-val '+(variation===null?"neu":variation<=0?"pos":"neg")+'">'+(variation!==null?(variation>=0?"+":"")+variation.toFixed(1)+"%":"--")+'</div></div>'+
+      '<div class="indic"><div class="indic-label">vs Moyenne zone</div><div class="indic-val '+(ecartMoy===null?"neu":ecartMoy<=0?"pos":"neg")+'">'+(ecartMoy!==null?(ecartMoy>=0?"+":"")+ecartMoy.toFixed(1)+"%":"--")+'</div></div>'+
+      '<div class="indic"><div class="indic-label">Min période</div><div class="indic-val pos">'+(minPrix?minPrix.toFixed(3)+"€":"--")+'</div></div>'+
+      '<div class="indic"><div class="indic-label">Max période</div><div class="indic-val neg">'+(maxPrix?maxPrix.toFixed(3)+"€":"--")+'</div></div>'+
+      '<div class="indic"><div class="indic-label">Moy. zone</div><div class="indic-val neu">'+(moyGlobal?moyGlobal.toFixed(3)+"€":"--")+'</div></div>';
+    document.getElementById("analyseIndicateurs").innerHTML=indHtml;
+    document.getElementById("analyseIndicateurs").style.display="grid";
+
+    // Dessiner graphique
+    dessinerGraphique(dates,serieStation,serieMoy,analysePeriode);
+    document.getElementById("analyseLoading").style.display="none";
+    document.getElementById("analyseGraphContainer").style.display="block";
+  }).catch(function(){
+    document.getElementById("analyseLoading").style.display="none";
+    document.getElementById("analyseGraphContainer").innerHTML='<div style="text-align:center;color:#ff6b35;padding:20px">Erreur de chargement</div>';
+    document.getElementById("analyseGraphContainer").style.display="block";
+  });
+}
+
+function dessinerGraphique(dates,serieStation,serieMoy,periode){
+  var canvas=document.getElementById("analyseGraph");
+  var ctx=canvas.getContext("2d");
+  var W=canvas.parentElement.clientWidth-32;
+  canvas.width=W;canvas.height=200;
+  ctx.clearRect(0,0,W,200);
+
+  // Filtrer les valeurs non nulles pour les min/max
+  var allVals=serieStation.concat(serieMoy).filter(function(x){return x!==null;});
+  if(!allVals.length)return;
+  var minV=Math.min.apply(null,allVals)*0.998,maxV=Math.max.apply(null,allVals)*1.002;
+  var rangeV=maxV-minV||0.01;
+
+  var pad={t:10,r:10,b:30,l:50};
+  var gW=W-pad.l-pad.r,gH=200-pad.t-pad.b;
+  var n=dates.length;
+
+  function xPos(i){return pad.l+i/(n-1||1)*gW;}
+  function yPos(v){return pad.t+gH-(v-minV)/rangeV*gH;}
+
+  // Fond grille
+  ctx.strokeStyle="#252535";ctx.lineWidth=1;
+  for(var g=0;g<=4;g++){
+    var y=pad.t+g/4*gH;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+gW,y);ctx.stroke();
+    var val=maxV-g/4*rangeV;
+    ctx.fillStyle="#6b6b8a";ctx.font="9px sans-serif";ctx.textAlign="right";
+    ctx.fillText(val.toFixed(3),pad.l-4,y+3);
+  }
+
+  // Labels dates
+  ctx.fillStyle="#6b6b8a";ctx.font="9px sans-serif";ctx.textAlign="center";
+  var step=Math.max(1,Math.floor(n/5));
+  for(var i=0;i<n;i+=step){
+    var d=dates[i];
+    var label=periode<=7?d.slice(5):periode<=30?d.slice(5):d.slice(0,7);
+    ctx.fillText(label,xPos(i),200-5);
+  }
+
+  // Zone remplie sous la courbe station
+  var firstSt=null;
+  for(var i=0;i<n;i++){if(serieStation[i]!==null){firstSt=i;break;}}
+  if(firstSt!==null){
+    ctx.beginPath();
+    var started=false;
+    for(var i=firstSt;i<n;i++){
+      if(serieStation[i]===null)continue;
+      if(!started){ctx.moveTo(xPos(i),yPos(serieStation[i]));started=true;}
+      else ctx.lineTo(xPos(i),yPos(serieStation[i]));
+    }
+    var lastSt=null;for(var i=n-1;i>=0;i--){if(serieStation[i]!==null){lastSt=i;break;}}
+    ctx.lineTo(xPos(lastSt),pad.t+gH);ctx.lineTo(xPos(firstSt),pad.t+gH);ctx.closePath();
+    var grad=ctx.createLinearGradient(0,pad.t,0,pad.t+gH);
+    grad.addColorStop(0,"rgba(245,166,35,0.3)");grad.addColorStop(1,"rgba(245,166,35,0)");
+    ctx.fillStyle=grad;ctx.fill();
+  }
+
+  // Ligne moyenne zone
+  ctx.beginPath();ctx.strokeStyle="#6b6b8a";ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
+  var startedMoy=false;
+  for(var i=0;i<n;i++){
+    if(serieMoy[i]===null)continue;
+    if(!startedMoy){ctx.moveTo(xPos(i),yPos(serieMoy[i]));startedMoy=true;}
+    else ctx.lineTo(xPos(i),yPos(serieMoy[i]));
+  }
+  ctx.stroke();ctx.setLineDash([]);
+
+  // Ligne station
+  ctx.beginPath();ctx.strokeStyle="#f5a623";ctx.lineWidth=2.5;
+  var startedSt=false;
+  for(var i=0;i<n;i++){
+    if(serieStation[i]===null)continue;
+    if(!startedSt){ctx.moveTo(xPos(i),yPos(serieStation[i]));startedSt=true;}
+    else ctx.lineTo(xPos(i),yPos(serieStation[i]));
+  }
+  ctx.stroke();
+
+  // Légende
+  ctx.fillStyle="#f5a623";ctx.fillRect(pad.l,8,20,3);
+  ctx.fillStyle="#e8e8f0";ctx.font="10px sans-serif";ctx.textAlign="left";ctx.fillText("Cette station",pad.l+24,12);
+  ctx.strokeStyle="#6b6b8a";ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
+  ctx.beginPath();ctx.moveTo(pad.l+100,10);ctx.lineTo(pad.l+120,10);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle="#6b6b8a";ctx.fillText("Moyenne zone",pad.l+124,12);
 }
 </script>
 </body>
