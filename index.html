@@ -212,7 +212,8 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
       <div id="analyseNom" style="font-size:14px;font-weight:700"></div>
       <div id="analyseAddr" style="font-size:11px;color:#6b6b8a"></div>
     </div>
-    <div id="analyseEmpty" style="text-align:center;padding:30px 0;color:#6b6b8a;font-size:13px">Appuie sur ⋮ sur une station puis "Analyser"</div>
+    <div id="analyseEmpty" style="text-align:center;padding:30px 0;color:#6b6b8a;font-size:13px">Sélectionne une station favorite ci-dessous ou appuie sur ⋮ sur une station</div>
+    <div id="analyseFavsList"></div>
     <!-- Sélecteur période -->
     <div id="analysePeriodes" style="display:none;flex;gap:4px;background:#16161f;border:1px solid #252535;border-radius:10px;padding:4px;margin-bottom:16px;overflow-x:auto">
       <button class="rb a" data-p="7" onclick="setPeriode(this)">7 jours</button>
@@ -309,7 +310,7 @@ function showPage(name){
   document.getElementById("nav-"+name).classList.add("active");
   if(name==="map") initMap();
   if(name==="trajet") initTrajetPage();
-  if(name==="analyse"&&analyseStationData) chargerAnalyse();
+  if(name==="analyse") initAnalysePage();
 }
 
 function initMap(){
@@ -395,7 +396,16 @@ function isOpen(horairesStr){
   }catch(e){return true;}
 }
 
-function toggleAcc(id){var body=document.getElementById(id),arrow=document.getElementById(id+"Arrow"),open=body.classList.contains("open");body.classList.toggle("open",!open);arrow.classList.toggle("open",!open);}
+function toggleAcc(id){
+  var body=document.getElementById(id),arrow=document.getElementById(id+"Arrow"),open=body.classList.contains("open");
+  // Fermer toutes les sections
+  ["favAcc","repAcc","alertAcc","aboutAcc"].forEach(function(a){
+    document.getElementById(a).classList.remove("open");
+    document.getElementById(a+"Arrow").classList.remove("open");
+  });
+  // Ouvrir celle cliquée si elle était fermée
+  if(!open){body.classList.add("open");arrow.classList.add("open");}
+}
 function openMenu(){renderFavList();renderRepList();updateAlertUI();document.getElementById("overlay").classList.add("on");document.getElementById("sideMenu").classList.add("on");}
 function closeMenu(){document.getElementById("overlay").classList.remove("on");document.getElementById("sideMenu").classList.remove("on");}
 
@@ -457,7 +467,7 @@ function closeAllCtx(){document.querySelectorAll(".ctx-menu").forEach(function(m
 function toggleCtx(id,fav){
   closeAllCtx();var card=document.getElementById("card-"+id);if(!card)return;
   var menu=document.createElement("div");menu.className="ctx-menu";
-  menu.innerHTML='<button class="ctx-item" onclick="openRenameModal(\''+id+'\')">✏️ Renommer</button><div class="ctx-divider"></div><button class="ctx-item" onclick="doFav(\''+id+'\')">'+(fav?"⭐ Retirer des favoris":"⭐ Ajouter aux favoris")+'</button>';
+  menu.innerHTML='<button class="ctx-item" onclick="ouvrirAnalyse(\''+id+'\')" style="color:#3ddc97">📊 Analyser cette station</button><div class="ctx-divider"></div><button class="ctx-item" onclick="openRenameModal(\''+id+'\')">✏️ Renommer</button><div class="ctx-divider"></div><button class="ctx-item" onclick="doFav(\''+id+'\')">'+(fav?"⭐ Retirer des favoris":"⭐ Ajouter aux favoris")+'</button>';
   card.appendChild(menu);setTimeout(function(){document.addEventListener("click",closeAllCtx,{once:true});},10);
 }
 function doFav(id){toggleFav(id);closeAllCtx();render();renderFavList();}
@@ -678,11 +688,29 @@ function lancerTrajet(){
 }
 
 // ===== ANALYSE =====
+function initAnalysePage(){
+  var favs=getFavs(),names=getNames(),ids=Object.keys(favs);
+  var el=document.getElementById("analyseFavsList");
+  if(!ids.length){
+    el.innerHTML='<div style="font-size:12px;color:#6b6b8a;text-align:center;padding:10px">Aucun favori — ajoute des stations via ⋮</div>';
+  } else {
+    el.innerHTML='<div style="font-size:11px;color:#6b6b8a;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Stations favorites</div>'+
+      ids.map(function(id){
+        var s=st.find(function(x){return String(x.id)===id;});
+        var nom=names[id]||(s?(s.adresse+" "+s.ville):"Station #"+id);
+        var actif=analyseStationId===id;
+        return '<button onclick="ouvrirAnalyse(''+id+'')" style="width:100%;text-align:left;padding:10px 12px;background:'+(actif?"#252535":"#16161f")+';border:1px solid '+(actif?"#f5a623":"#252535")+';border-radius:8px;margin-bottom:6px;color:#e8e8f0;font-size:13px;font-weight:'+(actif?"700":"400")+';cursor:pointer">'+
+          (actif?"▶ ":"")+'⭐ '+nom+'</button>';
+      }).join("");
+  }
+  if(analyseStationData) chargerAnalyse();
+}
 var analyseStationId=null,analysePeriode=7,analyseStationData=null;
 
 function ouvrirAnalyse(id){
   closeAllCtx();
   var s=st.find(function(x){return String(x.id)===String(id);});
+  if(!s){var favs=getFavs();if(!favs[id]){alert("Fais d'abord une recherche Radar pour voir cette station.");return;}}
   if(!s){alert("Station introuvable dans les résultats actuels.");return;}
   analyseStationData=s;
   analyseStationId=id;
