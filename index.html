@@ -747,22 +747,22 @@ function chargerAnalyse(){
   var s=analyseStationData;
   var dateDebut=new Date();dateDebut.setDate(dateDebut.getDate()-analysePeriode);
   var dateStr=dateDebut.toISOString().split('T')[0];
-    // Champs API historique opendatasoft (noms en snake_case)
-  var pkHist={Gazole:'prix_gazole',SP95:'prix_sp95',SP98:'prix_sp98',E10:'prix_e10',E85:'prix_e85',GPLc:'prix_gplc'};
-  var champHist=pkHist[fu]||'prix_gazole';
+    // Champs API historique opendatasoft
+  var pkHist={Gazole:'price_gazole',SP95:'price_sp95',SP98:'price_sp98',E10:'price_e10',E85:'price_e85',GPLc:'price_gplc'};
+  var champHist=pkHist[fu]||'price_gazole';
   var BASE='https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/prix-des-carburants-j-1/records';
-  var stationUrl=BASE+'?limit=100&where=identifiant_station%3D%22'+s.id+'%22%20AND%20date%3E%3D%22'+dateStr+'%22&order_by=date%20ASC&select=date%2C'+champHist;
-  var moyUrl=BASE+'?limit=100&where=within_distance(coordonnees%2Cgeom%27POINT('+s.lon+'%20'+s.lat+')%27%2C10000m)%20AND%20date%3E%3D%22'+dateStr+'%22&order_by=date%20ASC&select=date%2C'+champHist;
+  var stationUrl=BASE+'?limit=100&where=id%3D%22'+s.id+'%22%20AND%20update%3E%3D%22'+dateStr+'%22&order_by=update%20ASC&select=update%2C'+champHist;
+  var moyUrl=BASE+'?limit=100&where=within_distance(geo_point%2Cgeom%27POINT('+s.lon+'%20'+s.lat+')%27%2C10000m)%20AND%20update%3E%3D%22'+dateStr+'%22&order_by=update%20ASC&select=update%2C'+champHist;
   Promise.all([fetch(stationUrl).then(function(r){return r.json();}),fetch(moyUrl).then(function(r){return r.json();})])
   .then(function(results){
     var stationPrix={};
     if(results[0]&&results[0].results){results[0].results.forEach(function(r){
-      var d=r.date?r.date.split('T')[0]:null,p=parseFloat(r[champHist]);
+      var d=r.update?r.update.split('T')[0]:null,p=parseFloat(r[champHist]);
       if(d&&!isNaN(p)&&p>0)stationPrix[d]=p;
     });}
     var parDate={};
     if(results[1]&&results[1].results){results[1].results.forEach(function(r){
-      var d=r.date?r.date.split('T')[0]:null,p=parseFloat(r[champHist]);
+      var d=r.update?r.update.split('T')[0]:null,p=parseFloat(r[champHist]);
       if(d&&!isNaN(p)&&p>0){if(!parDate[d])parDate[d]=[];parDate[d].push(p);}
     });}
     var moyPrix={};Object.keys(parDate).forEach(function(d){var arr=parDate[d];moyPrix[d]=arr.reduce(function(a,b){return a+b;},0)/arr.length;});
