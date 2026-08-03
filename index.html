@@ -752,7 +752,7 @@ function chargerAnalyse(){
   var champHist=pkHist[fu]||'price_gazole';
   var BASE='https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/prix-des-carburants-j-1/records';
   var stationUrl=BASE+'?limit=100&where=id%3D%22'+s.id+'%22%20AND%20update%3E%3D%22'+dateStr+'%22&order_by=update%20ASC&select=update%2C'+champHist;
-  var moyUrl=BASE+'?limit=100&where=within_distance(geo_point%2Cgeom%27POINT('+s.lon+'%20'+s.lat+')%27%2C10000m)%20AND%20update%3E%3D%22'+dateStr+'%22&order_by=update%20ASC&select=update%2C'+champHist;
+  var moyUrl=BASE+'?limit=100&where=update%3E%3D%22'+dateStr+'%22&order_by=update%20ASC&select=update%2C'+champHist+'%2Cgeo_point';
   Promise.all([fetch(stationUrl).then(function(r){return r.json();}),fetch(moyUrl).then(function(r){return r.json();})])
   .then(function(results){
     var stationPrix={};
@@ -763,6 +763,8 @@ function chargerAnalyse(){
     var parDate={};
     if(results[1]&&results[1].results){results[1].results.forEach(function(r){
       var d=r.update?r.update.split('T')[0]:null,p=parseFloat(r[champHist]);
+      // Filtrer par distance côté client (10km)
+      if(r.geo_point){var dlat=r.geo_point.lat-s.lat,dlon=r.geo_point.lon-s.lon;var dist=Math.sqrt(dlat*dlat+dlon*dlon)*111;if(dist>10)return;}
       if(d&&!isNaN(p)&&p>0){if(!parDate[d])parDate[d]=[];parDate[d].push(p);}
     });}
     var moyPrix={};Object.keys(parDate).forEach(function(d){var arr=parDate[d];moyPrix[d]=arr.reduce(function(a,b){return a+b;},0)/arr.length;});
