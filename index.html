@@ -297,7 +297,7 @@ var FL={Gazole:'Diesel',SP95:'SP95',SP98:'SP98',E10:'E10',E85:'E85',GPLc:'GPL'};
 var PROXY='https://carburant-proxy.emilienzabukovec09.workers.dev';
 var OSRM='https://router.project-osrm.org/table/v1/driving/';
 var map=null,mapInit=false,userMarker=null,stationMarkers=[];
-var analyseStationId=null,analysePeriode=7,analyseStationData=null;
+var analyseStationId=null,analysePeriode=7,analyseStationData=null,analyseReqId=0;
 
 setTimeout(function(){var s=document.getElementById('splash');if(s)s.style.display='none';},3000);
 
@@ -714,23 +714,59 @@ function initAnalysePage(){
   if(analyseStationData) chargerAnalyse();
 }
 
+function recupererStationParId(id){
+  // Recupere adresse/ville/cp/lat/lon d'une station via son historique (utile pour un favori
+  // enregistre avec l'ancien format qui ne stockait pas ces infos).
+  var url='https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/prix-des-carburants-j-1/records?limit=1&where=id%3D%22'+id+'%22&order_by=update%20DESC&select=adresse%2Cville%2Ccp%2Cgeo_point';
+  return fetch(url).then(function(r){return r.json();}).then(function(d){
+    if(d&&d.results&&d.results.length&&d.results[0].geo_point){
+      var r=d.results[0];
+      return {id:id,lat:r.geo_point.lat,lon:r.geo_point.lon,adresse:r.adresse||'',ville:r.ville||'',cp:r.cp||'',prix:null};
+    }
+    return null;
+  }).catch(function(){return null;});
+}
+
 function ouvrirAnalyse(id){
   closeAllCtx();
+  document.getElementById('analyseStation').style.display='none';
+  document.getElementById('analysePeriodes').style.display='none';
+  document.getElementById('analyseIndicateurs').style.display='none';
+  document.getElementById('analyseGraphContainer').style.display='none';
   var s=st.find(function(x){return String(x.id)===String(id);});
-  if(!s){
-    // Essayer de récupérer depuis les favoris
-    var favs=getFavs();
-    var info=favs[id];
-    if(info&&info.lat){s={id:id,lat:info.lat,lon:info.lon,adresse:info.adresse||'',ville:info.ville||'',cp:info.cp||'',prix:null};}
-    else{alert('Fais une recherche Radar pour analyser cette station.');return;}
+  if(s){
+    demarrerAnalyseStation(id,s);
+    return;
   }
+  // Pas dans la recherche radar en cours : on tente les infos du favori
+  var favs=getFavs();
+  var info=favs[id];
+  if(info&&info.lat){
+    demarrerAnalyseStation(id,{id:id,lat:info.lat,lon:info.lon,adresse:info.adresse||'',ville:info.ville||'',cp:info.cp||'',prix:null});
+    return;
+  }
+  // Favori enregistre avec l'ancien format (sans lat/lon) : on va chercher les infos manquantes
+  document.getElementById('analyseLoading').style.display='block';
+  recupererStationParId(id).then(function(recupere){
+    document.getElementById('analyseLoading').style.display='none';
+    if(recupere){
+      // On complete le favori pour la prochaine fois
+      var f=getFavs();f[id]={lat:recupere.lat,lon:recupere.lon,adresse:recupere.adresse,ville:recupere.ville,cp:recupere.cp};setFavs(f);
+      demarrerAnalyseStation(id,recupere);
+    }else{
+      alert('Impossible de retrouver cette station. Fais une recherche Radar puis re-ajoute-la aux favoris.');
+    }
+  });
+}
+
+function demarrerAnalyseStation(id,s){
   analyseStationData=s;analyseStationId=id;
-  showPage('analyse');
   var names=getNames();
   document.getElementById('analyseNom').textContent=names[String(id)]||s.adresse;
   document.getElementById('analyseAddr').textContent=s.cp+' '+s.ville;
   document.getElementById('analyseStation').style.display='block';
   document.getElementById('analysePeriodes').style.display='flex';
+  initAnalysePage();
   chargerAnalyse();
 }
 
@@ -741,6 +777,8 @@ function setPeriode(b){
 
 function chargerAnalyse(){
   if(!analyseStationData)return;
+  var reqId=++analyseReqId;
+  var stationPourCetAppel=analyseStationId;
   document.getElementById('analyseLoading').style.display='block';
   document.getElementById('analyseGraphContainer').style.display='none';
   document.getElementById('analyseIndicateurs').style.display='none';
@@ -755,6 +793,8 @@ function chargerAnalyse(){
   var moyUrl=BASE+'?limit=100&where=update%3E%3D%22'+dateStr+'%22&order_by=update%20ASC&select=update%2C'+champHist+'%2Cgeo_point';
   Promise.all([fetch(stationUrl).then(function(r){return r.json();}),fetch(moyUrl).then(function(r){return r.json();})])
   .then(function(results){
+    // Si l'utilisateur a change de station/periode entre-temps, on ignore cette reponse perimee
+    if(reqId!==analyseReqId||stationPourCetAppel!==analyseStationId)return;
     var stationPrix={};
     if(results[0]&&results[0].results){results[0].results.forEach(function(r){
       var d=r.update?r.update.split('T')[0]:null,p=parseFloat(r[champHist]);
@@ -788,10 +828,11 @@ function chargerAnalyse(){
       '<div class="indic"><div class="indic-label">Max période</div><div class="indic-val neg">'+(maxPrix?maxPrix.toFixed(3)+'€':'--')+'</div></div>'+
       '<div class="indic"><div class="indic-label">Moy. zone</div><div class="indic-val neu">'+(moyGlobal?moyGlobal.toFixed(3)+'€':'--')+'</div></div>';
     document.getElementById('analyseIndicateurs').style.display='grid';
-    dessinerGraphique(dates,serieStation,serieMoy);
     document.getElementById('analyseLoading').style.display='none';
     document.getElementById('analyseGraphContainer').style.display='block';
+    dessinerGraphique(dates,serieStation,serieMoy);
   }).catch(function(){
+    if(reqId!==analyseReqId||stationPourCetAppel!==analyseStationId)return;
     document.getElementById('analyseLoading').style.display='none';
     document.getElementById('analyseGraphContainer').style.display='block';
     document.getElementById('analyseGraphContainer').innerHTML='<div style="text-align:center;color:#ff6b35;padding:20px;font-size:13px">Erreur de chargement de l\'historique</div>';
