@@ -213,26 +213,7 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
   <div style="padding:20px">
     <div style="font-size:16px;font-weight:800;margin-bottom:4px">📊 Analyse des prix</div>
     <div style="font-size:12px;color:#6b6b8a;margin-bottom:16px">Évolution du prix vs moyenne zone</div>
-    <div id="analyseStation" style="background:#16161f;border:1px solid #252535;border-radius:10px;padding:12px;margin-bottom:12px;display:none">
-      <div style="font-size:11px;color:#6b6b8a;margin-bottom:4px">STATION ANALYSÉE</div>
-      <div id="analyseNom" style="font-size:14px;font-weight:700"></div>
-      <div id="analyseAddr" style="font-size:11px;color:#6b6b8a"></div>
-    </div>
-    <div id="analyseFavsSection"></div>
-    <div id="analysePeriodes" style="display:none;flex-wrap:nowrap;gap:4px;background:#16161f;border:1px solid #252535;border-radius:10px;padding:4px;margin-bottom:16px;overflow-x:auto">
-      <button class="rb a" data-p="7" onclick="setPeriode(this)">7 jours</button>
-      <button class="rb" data-p="30" onclick="setPeriode(this)">1 mois</button>
-      <button class="rb" data-p="90" onclick="setPeriode(this)">3 mois</button>
-      <button class="rb" data-p="365" onclick="setPeriode(this)">1 an</button>
-    </div>
-    <div id="analyseIndicateurs" style="display:none" class="indic-grid"></div>
-    <div id="analyseGraphContainer" style="display:none;background:#16161f;border:1px solid #252535;border-radius:14px;padding:16px;margin-bottom:16px">
-      <canvas id="analyseGraph" height="200"></canvas>
-    </div>
-    <div id="analyseLoading" style="display:none;text-align:center;padding:30px 0">
-      <div class="spinner" style="margin:0 auto 10px"></div>
-      <div style="font-size:13px;color:#6b6b8a">Chargement de l'historique...</div>
-    </div>
+    <div id="analyseList"></div>
   </div>
 </div>
 
@@ -297,7 +278,8 @@ var FL={Gazole:'Diesel',SP95:'SP95',SP98:'SP98',E10:'E10',E85:'E85',GPLc:'GPL'};
 var PROXY='https://carburant-proxy.emilienzabukovec09.workers.dev';
 var OSRM='https://router.project-osrm.org/table/v1/driving/';
 var map=null,mapInit=false,userMarker=null,stationMarkers=[];
-var analyseStationId=null,analysePeriode=7,analyseStationData=null,analyseReqId=0;
+var analyseReqId=0;
+var analyseChart=null; // {dates,serieStation,serieMoy,pad,gW,gH,minV,rangeV,W,H,n}
 
 setTimeout(function(){var s=document.getElementById('splash');if(s)s.style.display='none';},3000);
 
@@ -468,7 +450,7 @@ function renderFavList(){
   el.innerHTML=ids.map(function(id){var s=st.find(function(x){return String(x.id)===id;});var nom=names[id]||(s?(s.adresse+' '+s.ville):'Station #'+id);
     return '<div class="side-item"><div class="side-item-row"><div><div class="side-item-name">⭐ '+nom+'</div>'+(s?'<div class="side-item-sub">'+s.cp+' '+s.ville+'</div>':'')+'</div><button class="del-btn" onclick="removeFav(\''+id+'\')">✕</button></div></div>';}).join('');
 }
-function removeFav(id){var f=getFavs();delete f[id];setFavs(f);renderFavList();render();}
+function removeFav(id){var f=getFavs();delete f[id];setFavs(f);renderFavList();render();if(analyseOpenId===id)analyseOpenId=null;if(document.getElementById('analyseList'))renderAnalyseListe();}
 function renderRepList(){
   var reps=getReps(),el=document.getElementById('repList');
   if(!reps.length){el.innerHTML='<div style="font-size:13px;color:#6b6b8a">Aucun repère pour l\'instant</div>';return;}
@@ -489,7 +471,7 @@ function toggleCtx(id,fav){
   var card=document.getElementById('card-'+id);if(!card)return;
   var menu=document.createElement('div');menu.className='ctx-menu';
   var b1=document.createElement('button');b1.className='ctx-item';b1.textContent='📊 Analyser cette station';b1.style.color='#3ddc97';
-  b1.onclick=function(){ouvrirAnalyse(id);};
+  b1.onclick=function(){analyserDepuisRadar(id);};
   var d1=document.createElement('div');d1.className='ctx-divider';
   var b2=document.createElement('button');b2.className='ctx-item';b2.textContent='✏️ Renommer';
   b2.onclick=function(){openRenameModal(id);};
@@ -500,7 +482,7 @@ function toggleCtx(id,fav){
   card.appendChild(menu);
   setTimeout(function(){document.addEventListener('click',closeAllCtx,{once:true});},10);
 }
-function doFav(id){toggleFav(id);closeAllCtx();render();renderFavList();}
+function doFav(id){toggleFav(id);closeAllCtx();render();renderFavList();if(document.getElementById('analyseList'))renderAnalyseListe();}
 function sf(b){document.querySelectorAll('.fb').forEach(function(x){x.classList.remove('a');});b.classList.add('a');fu=b.dataset.f;localStorage.setItem('cr_fu',fu);if(st.length)render();}
 function sr(b){document.querySelectorAll('.rb').forEach(function(x){x.classList.remove('a');});b.classList.add('a');ra=parseInt(b.dataset.k);localStorage.setItem('cr_ra',ra);if(la!=null)load();}
 function hv(a,b,c,d){var R=6371,dL=(c-a)*Math.PI/180,dO=(d-b)*Math.PI/180;var x=Math.sin(dL/2)*Math.sin(dL/2)+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dO/2)*Math.sin(dO/2);return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
@@ -694,24 +676,15 @@ function lancerTrajet(){
   });
 }
 
-// ===== ANALYSE =====
+// ===== ANALYSE (accordéon) =====
+var analyseItems={}; // id ('ZONE' ou id station) -> {periode:7, rayon:5}
+var analyseOpenId=null;
+
+function etatParDefaut(){return {periode:7,rayon:5,carburant:fu};}
 function initAnalysePage(){
-  var favs=getFavs(),names=getNames(),ids=Object.keys(favs);
-  var el=document.getElementById('analyseFavsSection');
-  if(!ids.length){
-    el.innerHTML='<div style="font-size:12px;color:#6b6b8a;text-align:center;padding:10px 0 16px">Ajoute des favoris via ⋮ sur une station, puis reviens ici.</div>';
-  } else {
-    var html='<div style="font-size:11px;color:#6b6b8a;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Stations favorites</div>';
-    ids.forEach(function(id){
-      var s=st.find(function(x){return String(x.id)===id;});
-      var nom=names[id]||(s?(s.adresse+' '+s.ville):'Station #'+id);
-      var actif=analyseStationId===id;
-      html+='<button class="fav-analyse-btn'+(actif?' active':'')+'" onclick="ouvrirAnalyse(\''+id+'\')">'+
-        (actif?'▶ ':'')+' ⭐ '+nom+'</button>';
-    });
-    el.innerHTML=html;
-  }
-  if(analyseStationData) chargerAnalyse();
+  if(!analyseItems.ZONE)analyseItems.ZONE=etatParDefaut();
+  renderAnalyseListe();
+  if(analyseOpenId)chargerAnalyseItem(analyseOpenId);
 }
 
 function recupererStationParId(id){
@@ -727,74 +700,136 @@ function recupererStationParId(id){
   }).catch(function(){return null;});
 }
 
-function ouvrirAnalyse(id){
+// Ouvre l'analyse d'une station depuis le menu ⋮ du Radar
+function analyserDepuisRadar(id){
   closeAllCtx();
-  document.getElementById('analyseStation').style.display='none';
-  document.getElementById('analysePeriodes').style.display='none';
-  document.getElementById('analyseIndicateurs').style.display='none';
-  document.getElementById('analyseGraphContainer').style.display='none';
+  if(!analyseItems[id])analyseItems[id]=etatParDefaut();
+  analyseOpenId=id;
+  showPage('analyse');
+}
+
+function toggleAnalyseItem(id){
+  closeAllCtx();
+  if(analyseOpenId===id){analyseOpenId=null;renderAnalyseListe();return;}
+  if(!analyseItems[id])analyseItems[id]=etatParDefaut();
+  analyseOpenId=id;
+  renderAnalyseListe();
+  chargerAnalyseItem(id);
+}
+function setPeriodeItem(id,p){analyseItems[id].periode=p;renderAnalyseListe();chargerAnalyseItem(id);}
+function setRayonItem(id,r){analyseItems[id].rayon=r;renderAnalyseListe();chargerAnalyseItem(id);}
+function setCarburantItem(id,c){analyseItems[id].carburant=c;renderAnalyseListe();chargerAnalyseItem(id);}
+
+function selecteurPeriode(id,periodeActuelle){
+  var opts=[[7,'7 jours'],[30,'1 mois'],[90,'3 mois'],[365,'1 an']];
+  return '<div style="display:flex;gap:4px;background:#0f0f16;border:1px solid #252535;border-radius:10px;padding:4px;margin-bottom:8px;overflow-x:auto">'+
+    opts.map(function(o){return '<button class="rb'+(o[0]===periodeActuelle?' a':'')+'" onclick="event.stopPropagation();setPeriodeItem(\''+id+'\','+o[0]+')">'+o[1]+'</button>';}).join('')+
+    '</div>';
+}
+function selecteurRayon(id,rayonActuel){
+  var opts=[5,10,20,50];
+  return '<div style="display:flex;gap:4px;background:#0f0f16;border:1px solid #252535;border-radius:10px;padding:4px;margin-bottom:8px;overflow-x:auto">'+
+    opts.map(function(r){return '<button class="rb'+(r===rayonActuel?' a':'')+'" onclick="event.stopPropagation();setRayonItem(\''+id+'\','+r+')">'+r+' km</button>';}).join('')+
+    '</div>';
+}
+function selecteurCarburant(id,carburantActuel){
+  var opts=Object.keys(FL);
+  return '<div style="display:flex;gap:4px;background:#0f0f16;border:1px solid #252535;border-radius:10px;padding:4px;margin-bottom:10px;overflow-x:auto">'+
+    opts.map(function(c){return '<button class="fb'+(c===carburantActuel?' a':'')+'" onclick="event.stopPropagation();setCarburantItem(\''+id+'\',\''+c+'\')">'+FL[c]+'</button>';}).join('')+
+    '</div>';
+}
+function panneauSquelette(){
+  return '<div id="analyseLoading" style="text-align:center;padding:24px 0"><div class="spinner" style="margin:0 auto 10px"></div><div style="font-size:12px;color:#6b6b8a">Chargement...</div></div>'+
+    '<div id="analyseSummary" style="display:none;margin-bottom:10px"></div>'+
+    '<div id="analyseIndicateurs" style="display:none;margin-bottom:10px" class="indic-grid"></div>'+
+    '<div id="analyseGraphContainer" style="display:none;position:relative;background:#16161f;border:1px solid #252535;border-radius:14px;padding:16px"><canvas id="analyseGraph"></canvas></div>';
+}
+
+function renderAnalyseListe(){
+  var favs=getFavs(),names=getNames(),ids=Object.keys(favs);
+  var etatZone=analyseItems.ZONE||etatParDefaut();
+  var zoneOuverte=analyseOpenId==='ZONE';
+  var html='<button class="fav-analyse-btn'+(zoneOuverte?' active':'')+'" style="border-color:#a78bfa" onclick="toggleAnalyseItem(\'ZONE\')">'+
+    (zoneOuverte?'▼ ':'▶ ')+'📊 Moyenne zone ('+etatZone.rayon+' km, '+FL[etatZone.carburant]+')</button>';
+  if(zoneOuverte){
+    html+='<div style="background:#0a0a0f;border-radius:0 0 10px 10px;margin:-6px 0 12px;padding:12px;border:1px solid #252535;border-top:none">'+
+      selecteurPeriode('ZONE',etatZone.periode)+selecteurRayon('ZONE',etatZone.rayon)+selecteurCarburant('ZONE',etatZone.carburant)+panneauSquelette()+'</div>';
+  }
+  html+='<div style="font-size:11px;color:#6b6b8a;margin:14px 0 8px;text-transform:uppercase;letter-spacing:1px">Stations favorites</div>';
+  if(!ids.length){
+    html+='<div style="font-size:12px;color:#6b6b8a;text-align:center;padding:10px 0 16px">Ajoute des favoris via ⋮ sur une station, puis reviens ici.</div>';
+  } else {
+    ids.forEach(function(id){
+      var s=st.find(function(x){return String(x.id)===id;});
+      var nom=names[id]||(s?(s.adresse+' '+s.ville):'Station #'+id);
+      var ouvert=analyseOpenId===id;
+      var etat=analyseItems[id]||etatParDefaut();
+      html+='<button class="fav-analyse-btn'+(ouvert?' active':'')+'" onclick="toggleAnalyseItem(\''+id+'\')">'+
+        (ouvert?'▼ ':'▶ ')+' ⭐ '+nom+'</button>';
+      if(ouvert){
+        html+='<div style="background:#0a0a0f;border-radius:0 0 10px 10px;margin:-6px 0 12px;padding:12px;border:1px solid #252535;border-top:none">'+
+          selecteurPeriode(id,etat.periode)+selecteurRayon(id,etat.rayon)+selecteurCarburant(id,etat.carburant)+panneauSquelette()+'</div>';
+      }
+    });
+  }
+  document.getElementById('analyseList').innerHTML=html;
+}
+
+function moyenneEtEvolution(serie){
+  var valid=serie.filter(function(x){return x!==null;});
+  if(!valid.length)return{moyenne:null,evolution:null};
+  var moyenne=valid.reduce(function(a,b){return a+b;},0)/valid.length;
+  var evolution=valid.length>1?((valid[valid.length-1]-valid[0])/valid[0]*100):null;
+  return{moyenne:moyenne,evolution:evolution};
+}
+function ligneEvolution(label,stat){
+  return '<div style="background:#0a0a0f;border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">'+
+    '<span style="font-size:12px;color:#e8e8f0">'+label+'</span>'+
+    '<span style="font-size:13px;font-weight:700">'+(stat.moyenne?stat.moyenne.toFixed(3)+'€':'--')+
+    (stat.evolution!==null?' <span style="color:'+(stat.evolution<=0?'#3ddc97':'#ff6b35')+';font-size:11px">('+(stat.evolution>=0?'+':'')+stat.evolution.toFixed(1)+'%)</span>':'')+
+    '</span></div>';
+}
+
+var pkHist={Gazole:'price_gazole',SP95:'price_sp95',SP98:'price_sp98',E10:'price_e10',E85:'price_e85',GPLc:'price_gplc'};
+var ANALYSE_BASE='https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/prix-des-carburants-j-1/records';
+
+function chargerAnalyseItem(id){
+  var etat=analyseItems[id];if(!etat)return;
+  var reqId=++analyseReqId;
+  if(id==='ZONE'){
+    if(la===null){
+      var c=document.getElementById('analyseLoading');
+      if(c)c.outerHTML='<div style="text-align:center;padding:20px 0;font-size:12px;color:#6b6b8a">Localise-toi dans l\'onglet Radar pour voir la moyenne de ta zone.</div>';
+      return;
+    }
+    chargerSerieZone(la,lo,etat.rayon,etat.periode,etat.carburant,reqId);
+    return;
+  }
   var s=st.find(function(x){return String(x.id)===String(id);});
-  if(s){
-    demarrerAnalyseStation(id,s);
-    return;
-  }
-  // Pas dans la recherche radar en cours : on tente les infos du favori
-  var favs=getFavs();
-  var info=favs[id];
-  if(info&&info.lat){
-    demarrerAnalyseStation(id,{id:id,lat:info.lat,lon:info.lon,adresse:info.adresse||'',ville:info.ville||'',cp:info.cp||'',prix:null});
-    return;
-  }
-  // Favori enregistre avec l'ancien format (sans lat/lon) : on va chercher les infos manquantes
-  document.getElementById('analyseLoading').style.display='block';
+  if(s){chargerSerieStation(s,etat.rayon,etat.periode,etat.carburant,reqId);return;}
+  var favs=getFavs(),info=favs[id];
+  if(info&&info.lat){chargerSerieStation({id:id,lat:info.lat,lon:info.lon,adresse:info.adresse||'',ville:info.ville||'',cp:info.cp||''},etat.rayon,etat.periode,etat.carburant,reqId);return;}
   recupererStationParId(id).then(function(recupere){
-    document.getElementById('analyseLoading').style.display='none';
+    if(reqId!==analyseReqId)return;
     if(recupere){
-      // On complete le favori pour la prochaine fois
       var f=getFavs();f[id]={lat:recupere.lat,lon:recupere.lon,adresse:recupere.adresse,ville:recupere.ville,cp:recupere.cp};setFavs(f);
-      demarrerAnalyseStation(id,recupere);
+      chargerSerieStation(recupere,etat.rayon,etat.periode,etat.carburant,reqId);
     }else{
-      alert('Impossible de retrouver cette station. Fais une recherche Radar puis re-ajoute-la aux favoris.');
+      var c=document.getElementById('analyseLoading');
+      if(c)c.outerHTML='<div style="text-align:center;padding:20px;font-size:12px;color:#ff6b35">Station introuvable. Fais une recherche Radar puis re-ajoute-la aux favoris.</div>';
     }
   });
 }
 
-function demarrerAnalyseStation(id,s){
-  analyseStationData=s;analyseStationId=id;
-  var names=getNames();
-  document.getElementById('analyseNom').textContent=names[String(id)]||s.adresse;
-  document.getElementById('analyseAddr').textContent=s.cp+' '+s.ville;
-  document.getElementById('analyseStation').style.display='block';
-  document.getElementById('analysePeriodes').style.display='flex';
-  initAnalysePage();
-  chargerAnalyse();
-}
-
-function setPeriode(b){
-  document.querySelectorAll('#analysePeriodes .rb').forEach(function(x){x.classList.remove('a');});
-  b.classList.add('a');analysePeriode=parseInt(b.dataset.p);chargerAnalyse();
-}
-
-function chargerAnalyse(){
-  if(!analyseStationData)return;
-  var reqId=++analyseReqId;
-  var stationPourCetAppel=analyseStationId;
-  document.getElementById('analyseLoading').style.display='block';
-  document.getElementById('analyseGraphContainer').style.display='none';
-  document.getElementById('analyseIndicateurs').style.display='none';
-  var s=analyseStationData;
-  var dateDebut=new Date();dateDebut.setDate(dateDebut.getDate()-analysePeriode);
+function chargerSerieStation(s,rayon,periode,carburant,reqId){
+  var dateDebut=new Date();dateDebut.setDate(dateDebut.getDate()-periode);
   var dateStr=dateDebut.toISOString().split('T')[0];
-    // Champs API historique opendatasoft
-  var pkHist={Gazole:'price_gazole',SP95:'price_sp95',SP98:'price_sp98',E10:'price_e10',E85:'price_e85',GPLc:'price_gplc'};
-  var champHist=pkHist[fu]||'price_gazole';
-  var BASE='https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/prix-des-carburants-j-1/records';
-  var stationUrl=BASE+'?limit=100&where=id%3D%22'+s.id+'%22%20AND%20update%3E%3D%22'+dateStr+'%22&order_by=update%20ASC&select=update%2C'+champHist;
-  var moyUrl=BASE+'?limit=100&where=update%3E%3D%22'+dateStr+'%22&order_by=update%20ASC&select=update%2C'+champHist+'%2Cgeo_point';
+  var champHist=pkHist[carburant]||'price_gazole';
+  var stationUrl=ANALYSE_BASE+'?limit=100&where=id%3D%22'+s.id+'%22%20AND%20update%3E%3D%22'+dateStr+'%22&order_by=update%20ASC&select=update%2C'+champHist;
+  var moyUrl=ANALYSE_BASE+'?limit=100&where=update%3E%3D%22'+dateStr+'%22&order_by=update%20ASC&select=update%2C'+champHist+'%2Cgeo_point';
   Promise.all([fetch(stationUrl).then(function(r){return r.json();}),fetch(moyUrl).then(function(r){return r.json();})])
   .then(function(results){
-    // Si l'utilisateur a change de station/periode entre-temps, on ignore cette reponse perimee
-    if(reqId!==analyseReqId||stationPourCetAppel!==analyseStationId)return;
+    if(reqId!==analyseReqId)return;
     var stationPrix={};
     if(results[0]&&results[0].results){results[0].results.forEach(function(r){
       var d=r.update?r.update.split('T')[0]:null,p=parseFloat(r[champHist]);
@@ -803,95 +838,244 @@ function chargerAnalyse(){
     var parDate={};
     if(results[1]&&results[1].results){results[1].results.forEach(function(r){
       var d=r.update?r.update.split('T')[0]:null,p=parseFloat(r[champHist]);
-      // Filtrer par distance côté client (10km)
-      if(r.geo_point){var dlat=r.geo_point.lat-s.lat,dlon=r.geo_point.lon-s.lon;var dist=Math.sqrt(dlat*dlat+dlon*dlon)*111;if(dist>10)return;}
+      if(r.geo_point){var dlat=r.geo_point.lat-s.lat,dlon=r.geo_point.lon-s.lon;var dist=Math.sqrt(dlat*dlat+dlon*dlon)*111;if(dist>rayon)return;}
       if(d&&!isNaN(p)&&p>0){if(!parDate[d])parDate[d]=[];parDate[d].push(p);}
     });}
     var moyPrix={};Object.keys(parDate).forEach(function(d){var arr=parDate[d];moyPrix[d]=arr.reduce(function(a,b){return a+b;},0)/arr.length;});
     var dates=[],serieStation=[],serieMoy=[];
     var d=new Date(dateStr),fin=new Date();
     while(d<=fin){var ds=d.toISOString().split('T')[0];dates.push(ds);serieStation.push(stationPrix[ds]||null);serieMoy.push(moyPrix[ds]||null);d.setDate(d.getDate()+1);}
-    var stValid=serieStation.filter(function(x){return x!==null;});
-    var moyValid=serieMoy.filter(function(x){return x!==null;});
-    var dernierPrix=stValid.length?stValid[stValid.length-1]:null;
-    var premierPrix=stValid.length?stValid[0]:null;
-    var variation=dernierPrix&&premierPrix?((dernierPrix-premierPrix)/premierPrix*100):null;
-    var moyGlobal=moyValid.length?(moyValid.reduce(function(a,b){return a+b;},0)/moyValid.length):null;
-    var ecartMoy=dernierPrix&&moyGlobal?((dernierPrix-moyGlobal)/moyGlobal*100):null;
-    var minPrix=stValid.length?Math.min.apply(null,stValid):null;
-    var maxPrix=stValid.length?Math.max.apply(null,stValid):null;
-    document.getElementById('analyseIndicateurs').innerHTML=
-      '<div class="indic"><div class="indic-label">Prix actuel</div><div class="indic-val neu">'+(dernierPrix?dernierPrix.toFixed(3)+'€':'--')+'</div></div>'+
-      '<div class="indic"><div class="indic-label">Variation</div><div class="indic-val '+(variation===null?'neu':variation<=0?'pos':'neg')+'">'+(variation!==null?(variation>=0?'+':'')+variation.toFixed(1)+'%':'--')+'</div></div>'+
-      '<div class="indic"><div class="indic-label">vs Moy. zone</div><div class="indic-val '+(ecartMoy===null?'neu':ecartMoy<=0?'pos':'neg')+'">'+(ecartMoy!==null?(ecartMoy>=0?'+':'')+ecartMoy.toFixed(1)+'%':'--')+'</div></div>'+
-      '<div class="indic"><div class="indic-label">Min période</div><div class="indic-val pos">'+(minPrix?minPrix.toFixed(3)+'€':'--')+'</div></div>'+
-      '<div class="indic"><div class="indic-label">Max période</div><div class="indic-val neg">'+(maxPrix?maxPrix.toFixed(3)+'€':'--')+'</div></div>'+
-      '<div class="indic"><div class="indic-label">Moy. zone</div><div class="indic-val neu">'+(moyGlobal?moyGlobal.toFixed(3)+'€':'--')+'</div></div>';
-    document.getElementById('analyseIndicateurs').style.display='grid';
-    document.getElementById('analyseLoading').style.display='none';
-    document.getElementById('analyseGraphContainer').style.display='block';
-    dessinerGraphique(dates,serieStation,serieMoy);
+    afficherResultatStation(dates,serieStation,serieMoy,periode,rayon);
   }).catch(function(){
-    if(reqId!==analyseReqId||stationPourCetAppel!==analyseStationId)return;
-    document.getElementById('analyseLoading').style.display='none';
-    document.getElementById('analyseGraphContainer').style.display='block';
-    document.getElementById('analyseGraphContainer').innerHTML='<div style="text-align:center;color:#ff6b35;padding:20px;font-size:13px">Erreur de chargement de l\'historique</div>';
+    if(reqId!==analyseReqId)return;
+    var c=document.getElementById('analyseLoading');
+    if(c)c.outerHTML='<div style="text-align:center;color:#ff6b35;padding:20px;font-size:12px">Erreur de chargement</div>';
   });
 }
 
-function dessinerGraphique(dates,serieStation,serieMoy){
+function afficherResultatStation(dates,serieStation,serieMoy,periode,rayon){
+  var statStation=moyenneEtEvolution(serieStation),statZone=moyenneEtEvolution(serieMoy);
+  var loading=document.getElementById('analyseLoading');if(loading)loading.style.display='none';
+  var sum=document.getElementById('analyseSummary');
+  if(sum){sum.style.display='block';sum.innerHTML=ligneEvolution('Moyenne station',statStation)+ligneEvolution('Moyenne zone ('+rayon+' km)',statZone);}
+  var stValid=serieStation.filter(function(x){return x!==null;});
+  var dernierPrix=stValid.length?stValid[stValid.length-1]:null;
+  var minPrix=stValid.length?Math.min.apply(null,stValid):null;
+  var maxPrix=stValid.length?Math.max.apply(null,stValid):null;
+  var ecartMoy=dernierPrix&&statZone.moyenne?((dernierPrix-statZone.moyenne)/statZone.moyenne*100):null;
+  var indic=document.getElementById('analyseIndicateurs');
+  if(indic){
+    indic.style.display='grid';
+    indic.innerHTML=
+      '<div class="indic"><div class="indic-label">Prix actuel</div><div class="indic-val neu">'+(dernierPrix?dernierPrix.toFixed(3)+'€':'--')+'</div></div>'+
+      '<div class="indic"><div class="indic-label">Variation</div><div class="indic-val '+(statStation.evolution===null?'neu':statStation.evolution<=0?'pos':'neg')+'">'+(statStation.evolution!==null?(statStation.evolution>=0?'+':'')+statStation.evolution.toFixed(1)+'%':'--')+'</div></div>'+
+      '<div class="indic"><div class="indic-label">vs Moy. zone</div><div class="indic-val '+(ecartMoy===null?'neu':ecartMoy<=0?'pos':'neg')+'">'+(ecartMoy!==null?(ecartMoy>=0?'+':'')+ecartMoy.toFixed(1)+'%':'--')+'</div></div>'+
+      '<div class="indic"><div class="indic-label">Min période</div><div class="indic-val pos">'+(minPrix?minPrix.toFixed(3)+'€':'--')+'</div></div>'+
+      '<div class="indic"><div class="indic-label">Max période</div><div class="indic-val neg">'+(maxPrix?maxPrix.toFixed(3)+'€':'--')+'</div></div>'+
+      '<div class="indic"><div class="indic-label">Moy. zone</div><div class="indic-val neu">'+(statZone.moyenne?statZone.moyenne.toFixed(3)+'€':'--')+'</div></div>';
+  }
+  var gc=document.getElementById('analyseGraphContainer');
+  if(gc){gc.style.display='block';gc.innerHTML='<canvas id="analyseGraph"></canvas><div id="analyseTooltip" style="display:none;position:absolute;background:#0a0a0f;border:1px solid #f5a623;border-radius:8px;padding:6px 10px;font-size:11px;pointer-events:none;white-space:nowrap;z-index:10"></div>';}
+  dessinerGraphique(dates,remplirTrous(serieStation),remplirTrous(serieMoy),periode,'Cette station','Moyenne zone');
+}
+
+function chargerSerieZone(lat,lon,rayon,periode,carburant,reqId){
+  var dateDebut=new Date();dateDebut.setDate(dateDebut.getDate()-periode);
+  var dateStr=dateDebut.toISOString().split('T')[0];
+  var champHist=pkHist[carburant]||'price_gazole';
+  var url=ANALYSE_BASE+'?limit=100&where=update%3E%3D%22'+dateStr+'%22&order_by=update%20ASC&select=update%2C'+champHist+'%2Cgeo_point';
+  fetch(url).then(function(r){return r.json();}).then(function(d){
+    if(reqId!==analyseReqId)return;
+    var parDate={};
+    if(d&&d.results){d.results.forEach(function(r){
+      var dd=r.update?r.update.split('T')[0]:null,p=parseFloat(r[champHist]);
+      if(r.geo_point){var dlat=r.geo_point.lat-lat,dlon=r.geo_point.lon-lon;var dist=Math.sqrt(dlat*dlat+dlon*dlon)*111;if(dist>rayon)return;}
+      if(dd&&!isNaN(p)&&p>0){if(!parDate[dd])parDate[dd]=[];parDate[dd].push(p);}
+    });}
+    var moyPrix={};Object.keys(parDate).forEach(function(dd){var arr=parDate[dd];moyPrix[dd]=arr.reduce(function(a,b){return a+b;},0)/arr.length;});
+    var dates=[],serie=[];
+    var d2=new Date(dateStr),fin=new Date();
+    while(d2<=fin){var ds=d2.toISOString().split('T')[0];dates.push(ds);serie.push(moyPrix[ds]||null);d2.setDate(d2.getDate()+1);}
+    afficherResultatZone(dates,serie,periode,rayon);
+  }).catch(function(){
+    if(reqId!==analyseReqId)return;
+    var c=document.getElementById('analyseLoading');
+    if(c)c.outerHTML='<div style="text-align:center;color:#ff6b35;padding:20px;font-size:12px">Erreur de chargement</div>';
+  });
+}
+
+function afficherResultatZone(dates,serie,periode,rayon){
+  var stat=moyenneEtEvolution(serie);
+  var loading=document.getElementById('analyseLoading');if(loading)loading.style.display='none';
+  var sum=document.getElementById('analyseSummary');
+  if(sum){sum.style.display='block';sum.innerHTML=ligneEvolution('Moyenne zone ('+rayon+' km)',stat);}
+  var indic=document.getElementById('analyseIndicateurs');if(indic)indic.style.display='none';
+  var gc=document.getElementById('analyseGraphContainer');
+  if(gc){gc.style.display='block';gc.innerHTML='<canvas id="analyseGraph"></canvas><div id="analyseTooltip" style="display:none;position:absolute;background:#0a0a0f;border:1px solid #f5a623;border-radius:8px;padding:6px 10px;font-size:11px;pointer-events:none;white-space:nowrap;z-index:10"></div>';}
+  dessinerGraphique(dates,remplirTrous(serie),serie.map(function(){return null;}),periode,'Moyenne zone',null);
+}
+
+function remplirTrous(arr){
+  var out=arr.slice(),last=null;
+  for(var i=0;i<out.length;i++){
+    if(out[i]!==null)last=out[i];
+    else if(last!==null)out[i]=last;
+  }
+  return out;
+}
+function fmtDateLabel(ds,periode){
+  var p=ds.split('-'),jj=p[2],mm=p[1],aa=p[0];
+  var moisAbr=['Jan','Fev','Mar','Avr','Mai','Jun','Jul','Aou','Sep','Oct','Nov','Dec'];
+  if(periode<=31)return jj+' '+moisAbr[parseInt(mm)-1];
+  return moisAbr[parseInt(mm)-1]+' '+aa;
+}
+function fmtDateComplete(ds){
+  var p=ds.split('-'),jours=['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+  var dt=new Date(ds+'T12:00:00');
+  var moisAbr=['Jan','Fev','Mar','Avr','Mai','Jun','Jul','Aou','Sep','Oct','Nov','Dec'];
+  return jours[dt.getDay()]+' '+parseInt(p[2])+' '+moisAbr[parseInt(p[1])-1];
+}
+
+function dessinerGraphique(dates,serieStation,serieMoy,periode,labelMain,labelRef){
+  labelMain=labelMain||'Cette station';
+  var container=document.getElementById('analyseGraphContainer');
   var canvas=document.getElementById('analyseGraph');
+  if(!canvas||!container)return;
+  var tooltip=document.getElementById('analyseTooltip');
+  var hasRef=!!labelRef&&serieMoy.some(function(x){return x!==null;});
+  var allVals=serieStation.concat(hasRef?serieMoy:[]).filter(function(x){return x!==null;});
+  var nbPointsStation=serieStation.filter(function(x){return x!==null;}).length;
+
+  if(!allVals.length){
+    container.innerHTML='<div style="text-align:center;color:#6b6b8a;padding:40px 10px;font-size:13px">Aucune donnée disponible pour cette période.</div>';
+    return;
+  }
+
+  // Résolution native (écran Retina) pour un rendu net
+  var dpr=window.devicePixelRatio||1;
+  var W=container.clientWidth-32,H=220;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  canvas.width=Math.round(W*dpr);canvas.height=Math.round(H*dpr);
   var ctx=canvas.getContext('2d');
-  var W=canvas.parentElement.clientWidth-32;
-  canvas.width=W;canvas.height=200;
-  ctx.clearRect(0,0,W,200);
-  var allVals=serieStation.concat(serieMoy).filter(function(x){return x!==null;});
-  if(!allVals.length)return;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+
   var minV=Math.min.apply(null,allVals)*0.998,maxV=Math.max.apply(null,allVals)*1.002,rangeV=maxV-minV||0.01;
-  var pad={t:20,r:10,b:30,l:52},gW=W-pad.l-pad.r,gH=200-pad.t-pad.b,n=dates.length;
+  var pad={t:20,r:12,b:26,l:54},gW=W-pad.l-pad.r,gH=H-pad.t-pad.b,n=dates.length;
   function xPos(i){return pad.l+i/(n-1||1)*gW;}
   function yPos(v){return pad.t+gH-(v-minV)/rangeV*gH;}
-  // Grille
-  ctx.strokeStyle='#252535';ctx.lineWidth=1;
-  for(var g=0;g<=4;g++){
-    var y=pad.t+g/4*gH;
-    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+gW,y);ctx.stroke();
-    ctx.fillStyle='#6b6b8a';ctx.font='9px sans-serif';ctx.textAlign='right';
-    ctx.fillText((maxV-g/4*rangeV).toFixed(3),pad.l-4,y+3);
+
+  // Sauvegarde pour l'interactivité (survol / tap)
+  analyseChart={dates:dates,serieStation:serieStation,serieMoy:serieMoy,pad:pad,gW:gW,gH:gH,minV:minV,rangeV:rangeV,W:W,H:H,n:n,xPos:xPos,yPos:yPos};
+
+  function dessinerBase(){
+    ctx.clearRect(0,0,W,H);
+    // Grille horizontale (niveaux de prix)
+    ctx.strokeStyle='#252535';ctx.lineWidth=1;
+    for(var g=0;g<=4;g++){
+      var y=pad.t+g/4*gH;
+      ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+gW,y);ctx.stroke();
+      ctx.fillStyle='#6b6b8a';ctx.font='9px sans-serif';ctx.textAlign='right';
+      ctx.fillText((maxV-g/4*rangeV).toFixed(3),pad.l-6,y+3);
+    }
+    // Grille verticale : une graduation par jour (7 pour 1 semaine, 30 pour 1 mois...),
+    // avec un espacement minimum pour rester lisible sur les longues périodes
+    ctx.strokeStyle='rgba(37,37,53,0.6)';ctx.lineWidth=1;
+    var gridStep=Math.max(1,Math.ceil(n/Math.max(1,Math.floor(gW/6))));
+    for(var i=0;i<n;i+=gridStep){
+      var x=xPos(i);
+      ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,pad.t+gH);ctx.stroke();
+    }
+    // Labels de dates : nombre limité pour rester lisible, alignement adapté aux bords
+    ctx.fillStyle='#6b6b8a';ctx.font='9px sans-serif';
+    var maxLabels=Math.max(2,Math.floor(gW/50));
+    var labelStep=Math.max(1,Math.ceil(n/maxLabels));
+    for(var i=0;i<n;i+=labelStep){
+      var x=xPos(i);
+      ctx.textAlign=i===0?'left':(i>=n-labelStep?'right':'center');
+      ctx.fillText(fmtDateLabel(dates[i],periode),Math.min(Math.max(x,pad.l),pad.l+gW),H-6);
+    }
+    // Toujours afficher le dernier jour
+    if((n-1)%labelStep!==0){
+      ctx.textAlign='right';
+      ctx.fillText(fmtDateLabel(dates[n-1],periode),pad.l+gW,H-6);
+    }
+    // Zone remplie station
+    var pts=[];for(var i=0;i<n;i++){if(serieStation[i]!==null)pts.push({x:xPos(i),y:yPos(serieStation[i])});}
+    if(pts.length>1){
+      ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+      for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
+      ctx.lineTo(pts[pts.length-1].x,pad.t+gH);ctx.lineTo(pts[0].x,pad.t+gH);ctx.closePath();
+      var grad=ctx.createLinearGradient(0,pad.t,0,pad.t+gH);
+      grad.addColorStop(0,'rgba(245,166,35,0.3)');grad.addColorStop(1,'rgba(245,166,35,0)');
+      ctx.fillStyle=grad;ctx.fill();
+    }
+    // Ligne de référence (moyenne zone), si présente
+    if(hasRef){
+      ctx.beginPath();ctx.strokeStyle='#555566';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
+      var startedMoy=false;
+      for(var i=0;i<n;i++){if(serieMoy[i]===null)continue;if(!startedMoy){ctx.moveTo(xPos(i),yPos(serieMoy[i]));startedMoy=true;}else ctx.lineTo(xPos(i),yPos(serieMoy[i]));}
+      ctx.stroke();ctx.setLineDash([]);
+    }
+    // Ligne principale
+    ctx.beginPath();ctx.strokeStyle='#f5a623';ctx.lineWidth=2.5;ctx.lineJoin='round';
+    var startedSt=false;
+    for(var i=0;i<n;i++){if(serieStation[i]===null)continue;if(!startedSt){ctx.moveTo(xPos(i),yPos(serieStation[i]));startedSt=true;}else ctx.lineTo(xPos(i),yPos(serieStation[i]));}
+    ctx.stroke();
+    // Points sur chaque jour avec donnée (essentiel quand il y a peu de points, ex: 1 seul jour sur 7)
+    ctx.fillStyle='#f5a623';
+    for(var i=0;i<n;i++){
+      if(serieStation[i]===null)continue;
+      ctx.beginPath();ctx.arc(xPos(i),yPos(serieStation[i]),pts.length<=3?3.5:2,0,Math.PI*2);ctx.fill();
+    }
+    // Légende
+    ctx.fillStyle='#f5a623';ctx.fillRect(pad.l,4,16,3);
+    ctx.fillStyle='#e8e8f0';ctx.font='10px sans-serif';ctx.textAlign='left';ctx.fillText(labelMain,pad.l+20,8);
+    if(hasRef){
+      ctx.strokeStyle='#555566';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
+      ctx.beginPath();ctx.moveTo(pad.l+108,6);ctx.lineTo(pad.l+124,6);ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle='#6b6b8a';ctx.fillText(labelRef,pad.l+128,8);
+    }
+    if(nbPointsStation<=1){
+      ctx.fillStyle='#6b6b8a';ctx.font='10px sans-serif';ctx.textAlign='center';
+      ctx.fillText('Une seule mise à jour de prix sur cette période',W/2,H/2);
+    }
   }
-  // Labels dates
-  ctx.fillStyle='#6b6b8a';ctx.font='9px sans-serif';ctx.textAlign='center';
-  var step=Math.max(1,Math.floor(n/5));
-  for(var i=0;i<n;i+=step){
-    var label=analysePeriode<=7?dates[i].slice(5):analysePeriode<=30?dates[i].slice(5):dates[i].slice(0,7);
-    ctx.fillText(label,xPos(i),200-5);
+  dessinerBase();
+
+  // ===== Interaction tactile / souris : afficher le prix exact du jour survolé =====
+  function trouverIndex(clientX){
+    var rect=canvas.getBoundingClientRect();
+    var relX=clientX-rect.left;
+    var ratio=(relX-pad.l)/gW;
+    var idx=Math.round(ratio*(n-1));
+    return Math.max(0,Math.min(n-1,idx));
   }
-  // Zone remplie station
-  var pts=[];for(var i=0;i<n;i++){if(serieStation[i]!==null)pts.push({x:xPos(i),y:yPos(serieStation[i])});}
-  if(pts.length>1){
-    ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
-    for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
-    ctx.lineTo(pts[pts.length-1].x,pad.t+gH);ctx.lineTo(pts[0].x,pad.t+gH);ctx.closePath();
-    var grad=ctx.createLinearGradient(0,pad.t,0,pad.t+gH);
-    grad.addColorStop(0,'rgba(245,166,35,0.3)');grad.addColorStop(1,'rgba(245,166,35,0)');
-    ctx.fillStyle=grad;ctx.fill();
+  function afficherSurvol(clientX,clientY){
+    var idx=trouverIndex(clientX);
+    dessinerBase();
+    var x=xPos(idx);
+    ctx.beginPath();ctx.strokeStyle='rgba(245,166,35,0.5)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+    ctx.moveTo(x,pad.t);ctx.lineTo(x,pad.t+gH);ctx.stroke();ctx.setLineDash([]);
+    if(serieStation[idx]!==null){
+      ctx.beginPath();ctx.fillStyle='#fff';ctx.arc(x,yPos(serieStation[idx]),4,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.fillStyle='#f5a623';ctx.arc(x,yPos(serieStation[idx]),2.5,0,Math.PI*2);ctx.fill();
+    }
+    var lignes='<b>'+fmtDateComplete(dates[idx])+'</b>';
+    lignes+='<br><span style="color:#f5a623">●</span> '+labelMain+': '+(serieStation[idx]!==null?serieStation[idx].toFixed(3)+'€':'pas de donnée');
+    if(hasRef)lignes+='<br><span style="color:#8a8aa5">- -</span> '+labelRef+': '+(serieMoy[idx]!==null?serieMoy[idx].toFixed(3)+'€':'pas de donnée');
+    tooltip.innerHTML=lignes;
+    tooltip.style.display='block';
+    var left=x+16,top=8;
+    if(left+130>W)left=x-140;
+    tooltip.style.left=left+'px';tooltip.style.top=top+'px';
   }
-  // Ligne moyenne
-  ctx.beginPath();ctx.strokeStyle='#555566';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
-  var startedMoy=false;
-  for(var i=0;i<n;i++){if(serieMoy[i]===null)continue;if(!startedMoy){ctx.moveTo(xPos(i),yPos(serieMoy[i]));startedMoy=true;}else ctx.lineTo(xPos(i),yPos(serieMoy[i]));}
-  ctx.stroke();ctx.setLineDash([]);
-  // Ligne station
-  ctx.beginPath();ctx.strokeStyle='#f5a623';ctx.lineWidth=2.5;
-  var startedSt=false;
-  for(var i=0;i<n;i++){if(serieStation[i]===null)continue;if(!startedSt){ctx.moveTo(xPos(i),yPos(serieStation[i]));startedSt=true;}else ctx.lineTo(xPos(i),yPos(serieStation[i]));}
-  ctx.stroke();
-  // Légende
-  ctx.fillStyle='#f5a623';ctx.fillRect(pad.l,6,16,3);
-  ctx.fillStyle='#e8e8f0';ctx.font='10px sans-serif';ctx.textAlign='left';ctx.fillText('Cette station',pad.l+20,10);
-  ctx.strokeStyle='#555566';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
-  ctx.beginPath();ctx.moveTo(pad.l+110,8);ctx.lineTo(pad.l+126,8);ctx.stroke();ctx.setLineDash([]);
-  ctx.fillStyle='#6b6b8a';ctx.fillText('Moyenne zone',pad.l+130,10);
+  function cacherSurvol(){tooltip.style.display='none';dessinerBase();}
+  canvas.onmousemove=function(e){afficherSurvol(e.clientX,e.clientY);};
+  canvas.onmouseleave=cacherSurvol;
+  canvas.ontouchstart=function(e){if(e.touches[0])afficherSurvol(e.touches[0].clientX,e.touches[0].clientY);};
+  canvas.ontouchmove=function(e){e.preventDefault();if(e.touches[0])afficherSurvol(e.touches[0].clientX,e.touches[0].clientY);};
+  canvas.ontouchend=cacherSurvol;
 }
 </script>
 </body>
