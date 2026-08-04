@@ -767,8 +767,10 @@ function renderAnalyseListe(){
       html+='<button class="fav-analyse-btn'+(ouvert?' active':'')+'" onclick="toggleAnalyseItem(\''+id+'\')">'+
         (ouvert?'▼ ':'▶ ')+' ⭐ '+nom+'</button>';
       if(ouvert){
+        // Pas de sélecteur de zone ici : la zone ne sert que pour l'item "Moyenne zone" tout en haut.
+        // La station utilise un rayon fixe (5km) juste pour tracer la courbe de référence, discrète, sur le graphique.
         html+='<div style="background:#0a0a0f;border-radius:0 0 10px 10px;margin:-6px 0 12px;padding:12px;border:1px solid #252535;border-top:none">'+
-          selecteurPeriode(id,etat.periode)+selecteurRayon(id,etat.rayon)+selecteurCarburant(id,etat.carburant)+panneauSquelette()+'</div>';
+          selecteurPeriode(id,etat.periode)+selecteurCarburant(id,etat.carburant)+panneauSquelette()+'</div>';
       }
     });
   }
@@ -777,21 +779,20 @@ function renderAnalyseListe(){
 
 function moyenneEtEvolution(serie){
   var valid=serie.filter(function(x){return x!==null;});
-  if(!valid.length)return{moyenne:null,evolution:null};
+  if(!valid.length)return{moyenne:null,evolution:null,dernier:null};
   var moyenne=valid.reduce(function(a,b){return a+b;},0)/valid.length;
   var evolution=valid.length>1?((valid[valid.length-1]-valid[0])/valid[0]*100):null;
-  return{moyenne:moyenne,evolution:evolution};
+  return{moyenne:moyenne,evolution:evolution,dernier:valid[valid.length-1]};
 }
-function ligneEvolution(label,stat){
-  return '<div style="background:#0a0a0f;border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">'+
-    '<span style="font-size:12px;color:#e8e8f0">'+label+'</span>'+
-    '<span style="font-size:13px;font-weight:700">'+(stat.moyenne?stat.moyenne.toFixed(3)+'€':'--')+
-    (stat.evolution!==null?' <span style="color:'+(stat.evolution<=0?'#3ddc97':'#ff6b35')+';font-size:11px">('+(stat.evolution>=0?'+':'')+stat.evolution.toFixed(1)+'%)</span>':'')+
-    '</span></div>';
+function grille3(stat){
+  return '<div class="indic"><div class="indic-label">Prix actuel</div><div class="indic-val neu">'+(stat.dernier?stat.dernier.toFixed(3)+'€':'--')+'</div></div>'+
+    '<div class="indic"><div class="indic-label">Variation</div><div class="indic-val '+(stat.evolution===null?'neu':stat.evolution<=0?'pos':'neg')+'">'+(stat.evolution!==null?(stat.evolution>=0?'+':'')+stat.evolution.toFixed(1)+'%':'--')+'</div></div>'+
+    '<div class="indic"><div class="indic-label">Moyenne période</div><div class="indic-val neu">'+(stat.moyenne?stat.moyenne.toFixed(3)+'€':'--')+'</div></div>';
 }
 
 var pkHist={Gazole:'price_gazole',SP95:'price_sp95',SP98:'price_sp98',E10:'price_e10',E85:'price_e85',GPLc:'price_gplc'};
 var ANALYSE_BASE='https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/prix-des-carburants-j-1/records';
+var STATION_ZONE_RAYON_KM=5; // rayon fixe utilisé uniquement pour la courbe de référence discrète sur le graphique d'une station
 
 function chargerAnalyseItem(id){
   var etat=analyseItems[id];if(!etat)return;
@@ -806,14 +807,14 @@ function chargerAnalyseItem(id){
     return;
   }
   var s=st.find(function(x){return String(x.id)===String(id);});
-  if(s){chargerSerieStation(s,etat.rayon,etat.periode,etat.carburant,reqId);return;}
+  if(s){chargerSerieStation(s,etat.periode,etat.carburant,reqId);return;}
   var favs=getFavs(),info=favs[id];
-  if(info&&info.lat){chargerSerieStation({id:id,lat:info.lat,lon:info.lon,adresse:info.adresse||'',ville:info.ville||'',cp:info.cp||''},etat.rayon,etat.periode,etat.carburant,reqId);return;}
+  if(info&&info.lat){chargerSerieStation({id:id,lat:info.lat,lon:info.lon,adresse:info.adresse||'',ville:info.ville||'',cp:info.cp||''},etat.periode,etat.carburant,reqId);return;}
   recupererStationParId(id).then(function(recupere){
     if(reqId!==analyseReqId)return;
     if(recupere){
       var f=getFavs();f[id]={lat:recupere.lat,lon:recupere.lon,adresse:recupere.adresse,ville:recupere.ville,cp:recupere.cp};setFavs(f);
-      chargerSerieStation(recupere,etat.rayon,etat.periode,etat.carburant,reqId);
+      chargerSerieStation(recupere,etat.periode,etat.carburant,reqId);
     }else{
       var c=document.getElementById('analyseLoading');
       if(c)c.outerHTML='<div style="text-align:center;padding:20px;font-size:12px;color:#ff6b35">Station introuvable. Fais une recherche Radar puis re-ajoute-la aux favoris.</div>';
@@ -821,13 +822,39 @@ function chargerAnalyseItem(id){
   });
 }
 
-function chargerSerieStation(s,rayon,periode,carburant,reqId){
+// Récupère l'historique de prix d'une zone (rayon en km autour de lat/lon) filtré CÔTÉ SERVEUR
+// (geofilter.distance), avec pagination, pour éviter de se limiter aux 100 premiers résultats
+// NATIONAUX (bug à l'origine de la courbe plate sur les longues périodes).
+function fetchHistoriqueZone(lat,lon,rayonKm,dateStr,champHist){
+  var nbPages=1;
+  var joursDepuisDebut=Math.ceil((new Date()-new Date(dateStr))/86400000);
+  if(joursDepuisDebut>90)nbPages=4;else if(joursDepuisDebut>30)nbPages=2;
+  var promesses=[];
+  for(var p=0;p<nbPages;p++){
+    var url=ANALYSE_BASE+'?limit=100&offset='+(p*100)+
+      '&where=update%3E%3D%22'+dateStr+'%22&order_by=update%20DESC&select=update%2C'+champHist+
+      '&geofilter.distance='+lat+'%2C'+lon+'%2C'+Math.round(rayonKm*1000);
+    promesses.push(fetch(url).then(function(r){return r.json();}).catch(function(){return null;}));
+  }
+  return Promise.all(promesses).then(function(pages){
+    var parDate={};
+    pages.forEach(function(d){
+      if(d&&d.results){d.results.forEach(function(r){
+        var dd=r.update?r.update.split('T')[0]:null,p=parseFloat(r[champHist]);
+        if(dd&&!isNaN(p)&&p>0){if(!parDate[dd])parDate[dd]=[];parDate[dd].push(p);}
+      });}
+    });
+    var moyPrix={};Object.keys(parDate).forEach(function(dd){var arr=parDate[dd];moyPrix[dd]=arr.reduce(function(a,b){return a+b;},0)/arr.length;});
+    return moyPrix;
+  });
+}
+
+function chargerSerieStation(s,periode,carburant,reqId){
   var dateDebut=new Date();dateDebut.setDate(dateDebut.getDate()-periode);
   var dateStr=dateDebut.toISOString().split('T')[0];
   var champHist=pkHist[carburant]||'price_gazole';
   var stationUrl=ANALYSE_BASE+'?limit=100&where=id%3D%22'+s.id+'%22%20AND%20update%3E%3D%22'+dateStr+'%22&order_by=update%20ASC&select=update%2C'+champHist;
-  var moyUrl=ANALYSE_BASE+'?limit=100&where=update%3E%3D%22'+dateStr+'%22&order_by=update%20ASC&select=update%2C'+champHist+'%2Cgeo_point';
-  Promise.all([fetch(stationUrl).then(function(r){return r.json();}),fetch(moyUrl).then(function(r){return r.json();})])
+  Promise.all([fetch(stationUrl).then(function(r){return r.json();}),fetchHistoriqueZone(s.lat,s.lon,STATION_ZONE_RAYON_KM,dateStr,champHist)])
   .then(function(results){
     if(reqId!==analyseReqId)return;
     var stationPrix={};
@@ -835,17 +862,11 @@ function chargerSerieStation(s,rayon,periode,carburant,reqId){
       var d=r.update?r.update.split('T')[0]:null,p=parseFloat(r[champHist]);
       if(d&&!isNaN(p)&&p>0)stationPrix[d]=p;
     });}
-    var parDate={};
-    if(results[1]&&results[1].results){results[1].results.forEach(function(r){
-      var d=r.update?r.update.split('T')[0]:null,p=parseFloat(r[champHist]);
-      if(r.geo_point){var dlat=r.geo_point.lat-s.lat,dlon=r.geo_point.lon-s.lon;var dist=Math.sqrt(dlat*dlat+dlon*dlon)*111;if(dist>rayon)return;}
-      if(d&&!isNaN(p)&&p>0){if(!parDate[d])parDate[d]=[];parDate[d].push(p);}
-    });}
-    var moyPrix={};Object.keys(parDate).forEach(function(d){var arr=parDate[d];moyPrix[d]=arr.reduce(function(a,b){return a+b;},0)/arr.length;});
+    var moyPrix=results[1];
     var dates=[],serieStation=[],serieMoy=[];
     var d=new Date(dateStr),fin=new Date();
     while(d<=fin){var ds=d.toISOString().split('T')[0];dates.push(ds);serieStation.push(stationPrix[ds]||null);serieMoy.push(moyPrix[ds]||null);d.setDate(d.getDate()+1);}
-    afficherResultatStation(dates,serieStation,serieMoy,periode,rayon);
+    afficherResultatStation(dates,serieStation,serieMoy,periode);
   }).catch(function(){
     if(reqId!==analyseReqId)return;
     var c=document.getElementById('analyseLoading');
@@ -853,50 +874,27 @@ function chargerSerieStation(s,rayon,periode,carburant,reqId){
   });
 }
 
-function afficherResultatStation(dates,serieStation,serieMoy,periode,rayon){
-  var statStation=moyenneEtEvolution(serieStation),statZone=moyenneEtEvolution(serieMoy);
+function afficherResultatStation(dates,serieStation,serieMoy,periode){
+  var statStation=moyenneEtEvolution(serieStation);
   var loading=document.getElementById('analyseLoading');if(loading)loading.style.display='none';
-  var sum=document.getElementById('analyseSummary');
-  if(sum){sum.style.display='block';sum.innerHTML=ligneEvolution('Moyenne station',statStation)+ligneEvolution('Moyenne zone ('+rayon+' km)',statZone);}
-  var stValid=serieStation.filter(function(x){return x!==null;});
-  var dernierPrix=stValid.length?stValid[stValid.length-1]:null;
-  var minPrix=stValid.length?Math.min.apply(null,stValid):null;
-  var maxPrix=stValid.length?Math.max.apply(null,stValid):null;
-  var ecartMoy=dernierPrix&&statZone.moyenne?((dernierPrix-statZone.moyenne)/statZone.moyenne*100):null;
+  var sum=document.getElementById('analyseSummary');if(sum)sum.style.display='none';
   var indic=document.getElementById('analyseIndicateurs');
-  if(indic){
-    indic.style.display='grid';
-    indic.innerHTML=
-      '<div class="indic"><div class="indic-label">Prix actuel</div><div class="indic-val neu">'+(dernierPrix?dernierPrix.toFixed(3)+'€':'--')+'</div></div>'+
-      '<div class="indic"><div class="indic-label">Variation</div><div class="indic-val '+(statStation.evolution===null?'neu':statStation.evolution<=0?'pos':'neg')+'">'+(statStation.evolution!==null?(statStation.evolution>=0?'+':'')+statStation.evolution.toFixed(1)+'%':'--')+'</div></div>'+
-      '<div class="indic"><div class="indic-label">vs Moy. zone</div><div class="indic-val '+(ecartMoy===null?'neu':ecartMoy<=0?'pos':'neg')+'">'+(ecartMoy!==null?(ecartMoy>=0?'+':'')+ecartMoy.toFixed(1)+'%':'--')+'</div></div>'+
-      '<div class="indic"><div class="indic-label">Min période</div><div class="indic-val pos">'+(minPrix?minPrix.toFixed(3)+'€':'--')+'</div></div>'+
-      '<div class="indic"><div class="indic-label">Max période</div><div class="indic-val neg">'+(maxPrix?maxPrix.toFixed(3)+'€':'--')+'</div></div>'+
-      '<div class="indic"><div class="indic-label">Moy. zone</div><div class="indic-val neu">'+(statZone.moyenne?statZone.moyenne.toFixed(3)+'€':'--')+'</div></div>';
-  }
+  if(indic){indic.style.display='grid';indic.innerHTML=grille3(statStation);}
   var gc=document.getElementById('analyseGraphContainer');
   if(gc){gc.style.display='block';gc.innerHTML='<canvas id="analyseGraph"></canvas><div id="analyseTooltip" style="display:none;position:absolute;background:#0a0a0f;border:1px solid #f5a623;border-radius:8px;padding:6px 10px;font-size:11px;pointer-events:none;white-space:nowrap;z-index:10"></div>';}
-  dessinerGraphique(dates,remplirTrous(serieStation),remplirTrous(serieMoy),periode,'Cette station','Moyenne zone');
+  dessinerGraphique(dates,remplirTrous(serieStation),remplirTrous(serieMoy),periode,'Cette station','Moyenne zone (5 km)');
 }
 
 function chargerSerieZone(lat,lon,rayon,periode,carburant,reqId){
   var dateDebut=new Date();dateDebut.setDate(dateDebut.getDate()-periode);
   var dateStr=dateDebut.toISOString().split('T')[0];
   var champHist=pkHist[carburant]||'price_gazole';
-  var url=ANALYSE_BASE+'?limit=100&where=update%3E%3D%22'+dateStr+'%22&order_by=update%20ASC&select=update%2C'+champHist+'%2Cgeo_point';
-  fetch(url).then(function(r){return r.json();}).then(function(d){
+  fetchHistoriqueZone(lat,lon,rayon,dateStr,champHist).then(function(moyPrix){
     if(reqId!==analyseReqId)return;
-    var parDate={};
-    if(d&&d.results){d.results.forEach(function(r){
-      var dd=r.update?r.update.split('T')[0]:null,p=parseFloat(r[champHist]);
-      if(r.geo_point){var dlat=r.geo_point.lat-lat,dlon=r.geo_point.lon-lon;var dist=Math.sqrt(dlat*dlat+dlon*dlon)*111;if(dist>rayon)return;}
-      if(dd&&!isNaN(p)&&p>0){if(!parDate[dd])parDate[dd]=[];parDate[dd].push(p);}
-    });}
-    var moyPrix={};Object.keys(parDate).forEach(function(dd){var arr=parDate[dd];moyPrix[dd]=arr.reduce(function(a,b){return a+b;},0)/arr.length;});
     var dates=[],serie=[];
     var d2=new Date(dateStr),fin=new Date();
     while(d2<=fin){var ds=d2.toISOString().split('T')[0];dates.push(ds);serie.push(moyPrix[ds]||null);d2.setDate(d2.getDate()+1);}
-    afficherResultatZone(dates,serie,periode,rayon);
+    afficherResultatZone(dates,serie,periode);
   }).catch(function(){
     if(reqId!==analyseReqId)return;
     var c=document.getElementById('analyseLoading');
@@ -904,12 +902,12 @@ function chargerSerieZone(lat,lon,rayon,periode,carburant,reqId){
   });
 }
 
-function afficherResultatZone(dates,serie,periode,rayon){
+function afficherResultatZone(dates,serie,periode){
   var stat=moyenneEtEvolution(serie);
   var loading=document.getElementById('analyseLoading');if(loading)loading.style.display='none';
-  var sum=document.getElementById('analyseSummary');
-  if(sum){sum.style.display='block';sum.innerHTML=ligneEvolution('Moyenne zone ('+rayon+' km)',stat);}
-  var indic=document.getElementById('analyseIndicateurs');if(indic)indic.style.display='none';
+  var sum=document.getElementById('analyseSummary');if(sum)sum.style.display='none';
+  var indic=document.getElementById('analyseIndicateurs');
+  if(indic){indic.style.display='grid';indic.innerHTML=grille3(stat);}
   var gc=document.getElementById('analyseGraphContainer');
   if(gc){gc.style.display='block';gc.innerHTML='<canvas id="analyseGraph"></canvas><div id="analyseTooltip" style="display:none;position:absolute;background:#0a0a0f;border:1px solid #f5a623;border-radius:8px;padding:6px 10px;font-size:11px;pointer-events:none;white-space:nowrap;z-index:10"></div>';}
   dessinerGraphique(dates,remplirTrous(serie),serie.map(function(){return null;}),periode,'Moyenne zone',null);
@@ -950,6 +948,11 @@ function dessinerGraphique(dates,serieStation,serieMoy,periode,labelMain,labelRe
     container.innerHTML='<div style="text-align:center;color:#6b6b8a;padding:40px 10px;font-size:13px">Aucune donnée disponible pour cette période.</div>';
     return;
   }
+  // Bouton de réinitialisation du zoom (ajouté une fois, affiché seulement quand on est zoomé)
+  var resetBtn=document.createElement('button');
+  resetBtn.textContent='↺ Zoom';
+  resetBtn.style.cssText='display:none;position:absolute;top:8px;right:8px;width:auto;padding:4px 9px;margin:0;background:#252535;color:#e8e8f0;border:1px solid #3a3a4a;border-radius:6px;font-size:10px;font-weight:600;z-index:11';
+  container.appendChild(resetBtn);
 
   // Résolution native (écran Retina) pour un rendu net
   var dpr=window.devicePixelRatio||1;
@@ -962,14 +965,20 @@ function dessinerGraphique(dates,serieStation,serieMoy,periode,labelMain,labelRe
 
   var minV=Math.min.apply(null,allVals)*0.998,maxV=Math.max.apply(null,allVals)*1.002,rangeV=maxV-minV||0.01;
   var pad={t:20,r:12,b:26,l:54},gW=W-pad.l-pad.r,gH=H-pad.t-pad.b,n=dates.length;
-  function xPos(i){return pad.l+i/(n-1||1)*gW;}
+
+  // Fenêtre visible (zoom) : indices [vueMin, vueMax] dans le tableau complet
+  var vueMin=0,vueMax=n-1;
+  function xPos(i){var span=(vueMax-vueMin)||1;return pad.l+(i-vueMin)/span*gW;}
   function yPos(v){return pad.t+gH-(v-minV)/rangeV*gH;}
 
   // Sauvegarde pour l'interactivité (survol / tap)
   analyseChart={dates:dates,serieStation:serieStation,serieMoy:serieMoy,pad:pad,gW:gW,gH:gH,minV:minV,rangeV:rangeV,W:W,H:H,n:n,xPos:xPos,yPos:yPos};
 
+  function majBoutonReset(){resetBtn.style.display=(vueMin>0.01||vueMax<n-1-0.01)?'block':'none';}
+
   function dessinerBase(){
     ctx.clearRect(0,0,W,H);
+    var iDebut=Math.max(0,Math.floor(vueMin)),iFin=Math.min(n-1,Math.ceil(vueMax)),nVisible=iFin-iDebut+1;
     // Grille horizontale (niveaux de prix)
     ctx.strokeStyle='#252535';ctx.lineWidth=1;
     for(var g=0;g<=4;g++){
@@ -978,30 +987,28 @@ function dessinerGraphique(dates,serieStation,serieMoy,periode,labelMain,labelRe
       ctx.fillStyle='#6b6b8a';ctx.font='9px sans-serif';ctx.textAlign='right';
       ctx.fillText((maxV-g/4*rangeV).toFixed(3),pad.l-6,y+3);
     }
-    // Grille verticale : une graduation par jour (7 pour 1 semaine, 30 pour 1 mois...),
-    // avec un espacement minimum pour rester lisible sur les longues périodes
+    // Grille verticale : une graduation par jour visible, avec un espacement minimum lisible
     ctx.strokeStyle='rgba(37,37,53,0.6)';ctx.lineWidth=1;
-    var gridStep=Math.max(1,Math.ceil(n/Math.max(1,Math.floor(gW/6))));
-    for(var i=0;i<n;i+=gridStep){
+    var gridStep=Math.max(1,Math.ceil(nVisible/Math.max(1,Math.floor(gW/6))));
+    for(var i=iDebut;i<=iFin;i+=gridStep){
       var x=xPos(i);
       ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,pad.t+gH);ctx.stroke();
     }
     // Labels de dates : nombre limité pour rester lisible, alignement adapté aux bords
     ctx.fillStyle='#6b6b8a';ctx.font='9px sans-serif';
     var maxLabels=Math.max(2,Math.floor(gW/50));
-    var labelStep=Math.max(1,Math.ceil(n/maxLabels));
-    for(var i=0;i<n;i+=labelStep){
+    var labelStep=Math.max(1,Math.ceil(nVisible/maxLabels));
+    for(var i=iDebut;i<=iFin;i+=labelStep){
       var x=xPos(i);
-      ctx.textAlign=i===0?'left':(i>=n-labelStep?'right':'center');
+      ctx.textAlign=i===iDebut?'left':(i>=iFin-labelStep?'right':'center');
       ctx.fillText(fmtDateLabel(dates[i],periode),Math.min(Math.max(x,pad.l),pad.l+gW),H-6);
     }
-    // Toujours afficher le dernier jour
-    if((n-1)%labelStep!==0){
+    if((iFin-iDebut)%labelStep!==0){
       ctx.textAlign='right';
-      ctx.fillText(fmtDateLabel(dates[n-1],periode),pad.l+gW,H-6);
+      ctx.fillText(fmtDateLabel(dates[iFin],periode),pad.l+gW,H-6);
     }
     // Zone remplie station
-    var pts=[];for(var i=0;i<n;i++){if(serieStation[i]!==null)pts.push({x:xPos(i),y:yPos(serieStation[i])});}
+    var pts=[];for(var i=iDebut;i<=iFin;i++){if(serieStation[i]!==null)pts.push({x:xPos(i),y:yPos(serieStation[i])});}
     if(pts.length>1){
       ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
       for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
@@ -1010,21 +1017,21 @@ function dessinerGraphique(dates,serieStation,serieMoy,periode,labelMain,labelRe
       grad.addColorStop(0,'rgba(245,166,35,0.3)');grad.addColorStop(1,'rgba(245,166,35,0)');
       ctx.fillStyle=grad;ctx.fill();
     }
-    // Ligne de référence (moyenne zone), si présente
+    // Ligne de référence (moyenne zone) : volontairement discrète, en arrière-plan
     if(hasRef){
-      ctx.beginPath();ctx.strokeStyle='#555566';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
+      ctx.beginPath();ctx.strokeStyle='rgba(120,120,140,0.45)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
       var startedMoy=false;
-      for(var i=0;i<n;i++){if(serieMoy[i]===null)continue;if(!startedMoy){ctx.moveTo(xPos(i),yPos(serieMoy[i]));startedMoy=true;}else ctx.lineTo(xPos(i),yPos(serieMoy[i]));}
+      for(var i=iDebut;i<=iFin;i++){if(serieMoy[i]===null)continue;if(!startedMoy){ctx.moveTo(xPos(i),yPos(serieMoy[i]));startedMoy=true;}else ctx.lineTo(xPos(i),yPos(serieMoy[i]));}
       ctx.stroke();ctx.setLineDash([]);
     }
     // Ligne principale
     ctx.beginPath();ctx.strokeStyle='#f5a623';ctx.lineWidth=2.5;ctx.lineJoin='round';
     var startedSt=false;
-    for(var i=0;i<n;i++){if(serieStation[i]===null)continue;if(!startedSt){ctx.moveTo(xPos(i),yPos(serieStation[i]));startedSt=true;}else ctx.lineTo(xPos(i),yPos(serieStation[i]));}
+    for(var i=iDebut;i<=iFin;i++){if(serieStation[i]===null)continue;if(!startedSt){ctx.moveTo(xPos(i),yPos(serieStation[i]));startedSt=true;}else ctx.lineTo(xPos(i),yPos(serieStation[i]));}
     ctx.stroke();
     // Points sur chaque jour avec donnée (essentiel quand il y a peu de points, ex: 1 seul jour sur 7)
     ctx.fillStyle='#f5a623';
-    for(var i=0;i<n;i++){
+    for(var i=iDebut;i<=iFin;i++){
       if(serieStation[i]===null)continue;
       ctx.beginPath();ctx.arc(xPos(i),yPos(serieStation[i]),pts.length<=3?3.5:2,0,Math.PI*2);ctx.fill();
     }
@@ -1032,7 +1039,7 @@ function dessinerGraphique(dates,serieStation,serieMoy,periode,labelMain,labelRe
     ctx.fillStyle='#f5a623';ctx.fillRect(pad.l,4,16,3);
     ctx.fillStyle='#e8e8f0';ctx.font='10px sans-serif';ctx.textAlign='left';ctx.fillText(labelMain,pad.l+20,8);
     if(hasRef){
-      ctx.strokeStyle='#555566';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
+      ctx.strokeStyle='rgba(120,120,140,0.6)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
       ctx.beginPath();ctx.moveTo(pad.l+108,6);ctx.lineTo(pad.l+124,6);ctx.stroke();ctx.setLineDash([]);
       ctx.fillStyle='#6b6b8a';ctx.fillText(labelRef,pad.l+128,8);
     }
@@ -1040,15 +1047,37 @@ function dessinerGraphique(dates,serieStation,serieMoy,periode,labelMain,labelRe
       ctx.fillStyle='#6b6b8a';ctx.font='10px sans-serif';ctx.textAlign='center';
       ctx.fillText('Une seule mise à jour de prix sur cette période',W/2,H/2);
     }
+    majBoutonReset();
   }
   dessinerBase();
+
+  // ===== Zoom : molette (desktop) et pincement à deux doigts (tactile) =====
+  function zoomVers(clientX,facteur){
+    var rect=canvas.getBoundingClientRect();
+    var relX=clientX-rect.left;
+    var ratio=Math.max(0,Math.min(1,(relX-pad.l)/gW));
+    var centre=vueMin+ratio*(vueMax-vueMin);
+    var largeur=Math.max(2,Math.min(n-1,(vueMax-vueMin)*facteur));
+    var nMin=centre-ratio*largeur,nMax=nMin+largeur;
+    if(nMin<0){nMax-=nMin;nMin=0;}
+    if(nMax>n-1){nMin-=(nMax-(n-1));nMax=n-1;}
+    vueMin=Math.max(0,nMin);vueMax=Math.min(n-1,nMax);
+    dessinerBase();
+  }
+  function reinitialiserZoom(){vueMin=0;vueMax=n-1;dessinerBase();}
+  resetBtn.onclick=reinitialiserZoom;
+  canvas.onwheel=function(e){e.preventDefault();zoomVers(e.clientX,e.deltaY<0?0.8:1.25);};
+
+  function distanceTouches(t){var dx=t[0].clientX-t[1].clientX,dy=t[0].clientY-t[1].clientY;return Math.sqrt(dx*dx+dy*dy);}
+  var pinchDistPrec=null;
+  var dernierTap=0;
 
   // ===== Interaction tactile / souris : afficher le prix exact du jour survolé =====
   function trouverIndex(clientX){
     var rect=canvas.getBoundingClientRect();
     var relX=clientX-rect.left;
     var ratio=(relX-pad.l)/gW;
-    var idx=Math.round(ratio*(n-1));
+    var idx=Math.round(vueMin+ratio*(vueMax-vueMin));
     return Math.max(0,Math.min(n-1,idx));
   }
   function afficherSurvol(clientX,clientY){
@@ -1073,9 +1102,35 @@ function dessinerGraphique(dates,serieStation,serieMoy,periode,labelMain,labelRe
   function cacherSurvol(){tooltip.style.display='none';dessinerBase();}
   canvas.onmousemove=function(e){afficherSurvol(e.clientX,e.clientY);};
   canvas.onmouseleave=cacherSurvol;
-  canvas.ontouchstart=function(e){if(e.touches[0])afficherSurvol(e.touches[0].clientX,e.touches[0].clientY);};
-  canvas.ontouchmove=function(e){e.preventDefault();if(e.touches[0])afficherSurvol(e.touches[0].clientX,e.touches[0].clientY);};
-  canvas.ontouchend=cacherSurvol;
+  canvas.ondblclick=reinitialiserZoom;
+  canvas.ontouchstart=function(e){
+    if(e.touches.length===2){
+      pinchDistPrec=distanceTouches(e.touches);
+      tooltip.style.display='none';
+    }else if(e.touches[0]){
+      var maintenant=Date.now();
+      if(maintenant-dernierTap<300)reinitialiserZoom();
+      dernierTap=maintenant;
+      afficherSurvol(e.touches[0].clientX,e.touches[0].clientY);
+    }
+  };
+  canvas.ontouchmove=function(e){
+    e.preventDefault();
+    if(e.touches.length===2){
+      var d=distanceTouches(e.touches);
+      if(pinchDistPrec){
+        var midX=(e.touches[0].clientX+e.touches[1].clientX)/2;
+        zoomVers(midX,pinchDistPrec/d);
+      }
+      pinchDistPrec=d;
+    }else if(e.touches[0]){
+      afficherSurvol(e.touches[0].clientX,e.touches[0].clientY);
+    }
+  };
+  canvas.ontouchend=function(e){
+    if(e.touches.length<2)pinchDistPrec=null;
+    if(e.touches.length===0)cacherSurvol();
+  };
 }
 </script>
 </body>
