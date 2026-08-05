@@ -131,6 +131,9 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
 .fav-analyse-btn{width:100%;text-align:left;padding:10px 12px;background:#16161f;border:1px solid #252535;border-radius:8px;margin-bottom:6px;color:#e8e8f0;font-size:13px;cursor:pointer;margin-top:0}
 .fav-analyse-btn.active{border-color:#f5a623;font-weight:700}
 </style>
+<!-- Cloudflare Web Analytics : remplace TOKEN_A_REMPLACER par ton vrai token une fois récupéré
+     (voir instructions ci-dessous) -->
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "TOKEN_A_REMPLACER"}'></script>
 </head>
 <body>
 <div id="splash">
@@ -336,7 +339,7 @@ function updateMapMarkers(){
   stationMarkers.forEach(function(m){m.remove();});stationMarkers=[];
   getReps().forEach(function(r){
     var icon=L.divIcon({html:'<div style="background:#a78bfa;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4)">📍</div>',iconSize:[28,28],iconAnchor:[14,14],className:''});
-    stationMarkers.push(L.marker([r.lat,r.lon],{icon:icon}).addTo(map).bindPopup('<div class="map-popup-name">'+r.name+'</div>'));
+    stationMarkers.push(L.marker([r.lat,r.lon],{icon:icon}).addTo(map).bindPopup('<div class="map-popup-name">'+echapperHTML(r.name)+'</div>'));
   });
   var names=getNames();
   st.forEach(function(s){
@@ -344,11 +347,17 @@ function updateMapMarkers(){
     var nom=names[String(s.id)]||s.adresse,px=s.prix?(s.prix.toFixed(3)+'€'):'N/A',color=s.prix?'#f5a623':'#6b6b8a';
     var icon=L.divIcon({html:'<div style="background:'+color+';color:#000;border-radius:8px;padding:2px 5px;font-size:10px;font-weight:700;white-space:nowrap;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4)">'+px+'</div>',iconSize:[null,null],iconAnchor:[0,0],className:''});
     var maps='https://www.google.com/maps/dir/?api=1&origin='+la+','+lo+'&destination='+s.lat+','+s.lon+'&travelmode=driving';
-    stationMarkers.push(L.marker([s.lat,s.lon],{icon:icon}).addTo(map).bindPopup('<div class="map-popup-name">'+nom+'</div><div class="map-popup-price">'+px+'</div><a class="map-popup-go" href="'+maps+'" target="_blank">Y aller</a>'));
+    stationMarkers.push(L.marker([s.lat,s.lon],{icon:icon}).addTo(map).bindPopup('<div class="map-popup-name">'+echapperHTML(nom)+'</div><div class="map-popup-price">'+px+'</div><a class="map-popup-go" href="'+maps+'" target="_blank">Y aller</a>'));
   });
 }
 
 function getLs(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
+// Échappe une chaîne avant insertion en HTML (protection XSS) — à utiliser pour toute donnée
+// venant de l'utilisateur (noms perso) ou d'une source externe (API gouvernementale) insérée via innerHTML.
+function echapperHTML(s){
+  if(s===null||s===undefined)return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 function setLs(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function getFavs(){return getLs('cr_favs')||{};}
 function setFavs(v){setLs('cr_favs',v);}
@@ -461,13 +470,13 @@ function renderFavList(){
   var favs=getFavs(),names=getNames(),ids=Object.keys(favs),el=document.getElementById('favList');
   if(!ids.length){el.innerHTML='<div style="font-size:13px;color:#6b6b8a">Aucun favori pour l\'instant</div>';return;}
   el.innerHTML=ids.map(function(id){var s=st.find(function(x){return String(x.id)===id;});var nom=names[id]||(s?(s.adresse+' '+s.ville):'Station #'+id);
-    return '<div class="side-item"><div class="side-item-row"><div><div class="side-item-name">⭐ '+nom+'</div>'+(s?'<div class="side-item-sub">'+s.cp+' '+s.ville+'</div>':'')+'</div><button class="del-btn" onclick="removeFav(\''+id+'\')">✕</button></div></div>';}).join('');
+    return '<div class="side-item"><div class="side-item-row"><div><div class="side-item-name">⭐ '+echapperHTML(nom)+'</div>'+(s?'<div class="side-item-sub">'+echapperHTML(s.cp)+' '+echapperHTML(s.ville)+'</div>':'')+'</div><button class="del-btn" onclick="removeFav(\''+id+'\')">✕</button></div></div>';}).join('');
 }
 function removeFav(id){var f=getFavs();delete f[id];setFavs(f);renderFavList();render();if(analyseOpenId===id)analyseOpenId=null;if(document.getElementById('analyseList'))renderAnalyseListe();}
 function renderRepList(){
   var reps=getReps(),el=document.getElementById('repList');
   if(!reps.length){el.innerHTML='<div style="font-size:13px;color:#6b6b8a">Aucun repère pour l\'instant</div>';return;}
-  el.innerHTML=reps.map(function(r,i){return '<div class="side-item"><div class="side-item-row"><div><div class="side-item-name">📍 '+r.name+'</div><div class="side-item-sub">'+r.lat.toFixed(4)+', '+r.lon.toFixed(4)+'</div></div><button class="del-btn" onclick="removeRep('+i+')">✕</button></div></div>';}).join('');
+  el.innerHTML=reps.map(function(r,i){return '<div class="side-item"><div class="side-item-row"><div><div class="side-item-name">📍 '+echapperHTML(r.name)+'</div><div class="side-item-sub">'+r.lat.toFixed(4)+', '+r.lon.toFixed(4)+'</div></div><button class="del-btn" onclick="removeRep('+i+')">✕</button></div></div>';}).join('');
 }
 function removeRep(i){var r=getReps();r.splice(i,1);setReps(r);renderRepList();}
 function openAddRepere(){if(la===null){alert('Localise-toi d\'abord !');return;}document.getElementById('repName').value='';document.getElementById('repPos').textContent=la.toFixed(4)+', '+lo.toFixed(4);document.getElementById('repModal').classList.add('on');}
@@ -561,8 +570,8 @@ function render(){
     return '<div class="card'+(best?' best':'')+(fav?' fav':'')+'" id="card-'+s.id+'">'+
       (best?'<div class="badge">MEILLEUR RATIO</div><br>':'')+
       '<div class="rank">#'+(i+1)+(s.score!==null?' - SCORE '+s.score+'/100':'')+(fav?' ⭐':'')+'</div>'+
-      '<div class="card-header"><div><div class="name">'+(nomPerso||s.adresse)+(s.automate?'<span class="open-badge">24h/24</span>':'')+'</div>'+
-      (nomPerso?'<div class="addr">'+s.adresse+'</div>':'<div class="addr">'+s.cp+' '+s.ville+'</div>')+
+      '<div class="card-header"><div><div class="name">'+echapperHTML(nomPerso||s.adresse)+(s.automate?'<span class="open-badge">24h/24</span>':'')+'</div>'+
+      (nomPerso?'<div class="addr">'+echapperHTML(s.adresse)+'</div>':'<div class="addr">'+echapperHTML(s.cp)+' '+echapperHTML(s.ville)+'</div>')+
       '</div><button class="dots-btn" onclick="toggleCtx(\''+s.id+'\','+(fav?'true':'false')+');event.stopPropagation()">⋮</button></div>'+
       '<div class="metrics"><div class="m"><div class="ml">Prix/L</div><div class="mv p">'+prix+'</div></div>'+
       '<div class="m"><div class="ml">Distance</div><div class="mv d">'+distTxt+'</div></div>'+
@@ -778,7 +787,7 @@ function renderAnalyseListe(){
       var ouvert=analyseOpenId===id;
       var etat=analyseItems[id]||etatParDefaut();
       html+='<button class="fav-analyse-btn'+(ouvert?' active':'')+'" onclick="toggleAnalyseItem(\''+id+'\')">'+
-        (ouvert?'▼ ':'▶ ')+' ⭐ '+nom+'</button>';
+        (ouvert?'▼ ':'▶ ')+' ⭐ '+echapperHTML(nom)+'</button>';
       if(ouvert){
         // Pas de sélecteur de zone ici : la zone ne sert que pour l'item "Moyenne zone" tout en haut.
         // La station utilise un rayon fixe (5km) juste pour tracer la courbe de référence, discrète, sur le graphique.
