@@ -138,6 +138,28 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
 .indic-val.neu{color:#e8e8f0}
 .fav-analyse-btn{width:100%;text-align:left;padding:10px 12px;background:#16161f;border:1px solid #252535;border-radius:8px;margin-bottom:6px;color:#e8e8f0;font-size:13px;cursor:pointer;margin-top:0}
 .fav-analyse-btn.active{border-color:#f5a623;font-weight:700}
+/* Pages d'information (À propos, Mentions légales, etc.) */
+.info-back{display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:#f5a623;font-size:13px;font-weight:600;cursor:pointer;padding:0;margin-bottom:16px;width:auto}
+.info-page h1{font-size:18px;font-weight:800;margin-bottom:4px}
+.info-page .info-sub{font-size:12px;color:#6b6b8a;margin-bottom:18px}
+.info-page h2{font-size:14px;font-weight:700;color:#f5a623;margin:20px 0 8px}
+.info-page h2:first-of-type{margin-top:0}
+.info-page p{font-size:13px;color:#c8c8d8;line-height:1.65;margin-bottom:10px}
+.info-page ul{margin:0 0 10px 18px;padding:0}
+.info-page li{font-size:13px;color:#c8c8d8;line-height:1.65;margin-bottom:4px}
+.info-page .info-card{background:#16161f;border:1px solid #252535;border-radius:12px;padding:14px 16px;margin-bottom:12px}
+.info-page .info-field{font-size:12px;color:#6b6b8a;margin-bottom:2px}
+.info-page .info-value{font-size:14px;color:#e8e8f0;margin-bottom:10px}
+.info-page .info-value:last-child{margin-bottom:0}
+.info-page .placeholder{color:#6b6b8a;font-style:italic}
+.contact-btn{display:block;text-align:center;padding:13px;background:#f5a623;color:#000;border-radius:12px;font-size:14px;font-weight:700;text-decoration:none;margin-bottom:12px}
+/* Footer discret */
+.app-footer{margin-top:28px;padding-top:16px;border-top:1px solid #1c1c2a;text-align:center}
+.app-footer .footer-copy{font-size:10px;color:#4a4a5e;margin-bottom:6px}
+.app-footer .footer-links{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;font-size:10px}
+.app-footer .footer-links a{color:#6b6b8a;text-decoration:none;cursor:pointer}
+.app-footer .footer-links a:hover{color:#f5a623}
+.app-footer .footer-sep{color:#3a3a4a}
 </style>
 <!-- Cloudflare Web Analytics : remplace TOKEN_A_REMPLACER par ton vrai token une fois récupéré
      (voir instructions ci-dessous) -->
@@ -195,6 +217,15 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
       <div style="font-size:13px">Appuie sur Me localiser</div>
     </div>
   </div>
+  <div style="padding:0 20px 20px"><div class="app-footer">
+      <div class="footer-copy">© 2026 CarburantRadar</div>
+      <div class="footer-links">
+        <a onclick="showPage(&#39;apropos&#39;)">À propos</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;mentions&#39;)">Mentions légales</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;confidentialite&#39;)">Politique de confidentialité</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;contact&#39;)">Contact</a>
+      </div>
+    </div></div>
 </div>
 
 <div class="page" id="page-trajet">
@@ -217,6 +248,15 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
     </select>
     <button onclick="lancerTrajet()" id="trajetBtn">Trouver la meilleure station</button>
     <div id="trajetResult"></div>
+    <div class="app-footer">
+      <div class="footer-copy">© 2026 CarburantRadar</div>
+      <div class="footer-links">
+        <a onclick="showPage(&#39;apropos&#39;)">À propos</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;mentions&#39;)">Mentions légales</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;confidentialite&#39;)">Politique de confidentialité</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;contact&#39;)">Contact</a>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -225,6 +265,147 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
     <div style="font-size:16px;font-weight:800;margin-bottom:4px">📊 Analyse des prix</div>
     <div style="font-size:12px;color:#6b6b8a;margin-bottom:16px">Évolution du prix vs moyenne zone</div>
     <div id="analyseList"></div>
+    <div class="app-footer">
+      <div class="footer-copy">© 2026 CarburantRadar</div>
+      <div class="footer-links">
+        <a onclick="showPage(&#39;apropos&#39;)">À propos</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;mentions&#39;)">Mentions légales</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;confidentialite&#39;)">Politique de confidentialité</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;contact&#39;)">Contact</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="page-apropos">
+  <div style="padding:20px" class="info-page">
+    <button class="info-back" onclick="showPage('radar')">← Retour</button>
+    <h1>ℹ️ À propos de CarburantRadar</h1>
+    <div class="info-sub">Version 1.2</div>
+
+    <h2>Présentation</h2>
+    <p>CarburantRadar est une application web gratuite qui aide les automobilistes à trouver rapidement les stations-service proposant les meilleurs prix de carburant autour d'eux. L'objectif est simple : éviter de payer plus cher que nécessaire en repérant en quelques secondes les stations les plus avantageuses dans une zone donnée.</p>
+
+    <h2>Comment ça fonctionne</h2>
+    <p>L'application récupère les prix des carburants pratiqués par les stations-service françaises et les affiche sur une carte ainsi que sous forme de liste triable.</p>
+    <ul>
+      <li><b>Choix du carburant</b> : Diesel, SP95, SP98, E10, E85 ou GPL, sélectionnable en un tap.</li>
+      <li><b>Recherche autour d'une position</b> : avec ton accord, l'app utilise ta position (ou une adresse choisie) pour afficher les stations dans un rayon que tu définis (5, 10, 20 ou 50 km).</li>
+      <li><b>Comparaison</b> : chaque station est classée selon un score combinant son prix et le temps de trajet pour s'y rendre, avec un onglet Analyse pour suivre l'évolution des prix dans le temps.</li>
+      <li><b>Système d'alertes</b> : tu peux être notifié quand une station de ta zone devient particulièrement avantageuse par rapport à la moyenne locale.</li>
+    </ul>
+
+    <h2>Origine des données</h2>
+    <p>Les prix affichés proviennent des données publiques officielles mises à disposition par le gouvernement français (data.economie.gouv.fr), dans le cadre de l'obligation de transparence des prix des carburants imposée aux stations-service.</p>
+
+    <h2>Limites à connaître</h2>
+    <p>Ces données ont deux limites importantes à garder en tête :</p>
+    <ul>
+      <li>Les prix peuvent évoluer entre deux mises à jour officielles : le prix affiché n'est donc pas garanti être exactement celui pratiqué à la pompe au moment où tu arrives sur place.</li>
+      <li>Les informations dépendent des déclarations transmises par chaque station elle-même : en cas d'erreur ou de retard de déclaration de leur part, l'écart peut être plus important.</li>
+    </ul>
+    <p>En cas de doute, nous te recommandons de vérifier l'affichage en station avant de faire le plein.</p>
+    <div class="app-footer">
+      <div class="footer-copy">© 2026 CarburantRadar</div>
+      <div class="footer-links">
+        <a onclick="showPage(&#39;apropos&#39;)">À propos</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;mentions&#39;)">Mentions légales</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;confidentialite&#39;)">Politique de confidentialité</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;contact&#39;)">Contact</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="page-mentions">
+  <div style="padding:20px" class="info-page">
+    <button class="info-back" onclick="showPage('radar')">← Retour</button>
+    <h1>📄 Mentions légales</h1>
+    <div class="info-sub">Dernière mise à jour : à compléter</div>
+
+    <div class="info-card">
+      <div class="info-field">Nom du site / application</div>
+      <div class="info-value">CarburantRadar</div>
+      <div class="info-field">Responsable de publication</div>
+      <div class="info-value placeholder">[Nom, prénom ou raison sociale à compléter]</div>
+      <div class="info-field">Adresse</div>
+      <div class="info-value placeholder">[Adresse postale à compléter, ou mention "non communiquée" si non applicable]</div>
+      <div class="info-field">Contact</div>
+      <div class="info-value" id="mentionsEmail"></div>
+      <div class="info-field">Hébergeur</div>
+      <div class="info-value">GitHub Pages — GitHub, Inc., 88 Colin P Kelly Jr St, San Francisco, CA 94107, États-Unis</div>
+      <div class="info-field">Date de dernière mise à jour</div>
+      <div class="info-value placeholder">[Date à compléter]</div>
+    </div>
+
+    <h2>Propriété intellectuelle</h2>
+    <p>Le contenu de CarburantRadar (textes, mise en page, code) est la propriété du responsable de publication mentionné ci-dessus, sauf mention contraire. Les données de prix des carburants proviennent de data.economie.gouv.fr et restent la propriété de leurs auteurs respectifs, réutilisées dans le cadre de la licence ouverte applicable aux données publiques françaises.</p>
+
+    <h2>Limitation de responsabilité</h2>
+    <p>CarburantRadar est un outil d'aide à la décision fourni "en l'état", sans garantie d'exactitude absolue des prix affichés (voir la page À propos pour le détail des limites liées aux données). Le responsable de publication ne saurait être tenu responsable d'un écart entre le prix affiché dans l'application et le prix constaté en station.</p>
+    <div class="app-footer">
+      <div class="footer-copy">© 2026 CarburantRadar</div>
+      <div class="footer-links">
+        <a onclick="showPage(&#39;apropos&#39;)">À propos</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;mentions&#39;)">Mentions légales</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;confidentialite&#39;)">Politique de confidentialité</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;contact&#39;)">Contact</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="page-confidentialite">
+  <div style="padding:20px" class="info-page">
+    <button class="info-back" onclick="showPage('radar')">← Retour</button>
+    <h1>🔒 Politique de confidentialité</h1>
+    <div class="info-sub">CarburantRadar respecte ta vie privée</div>
+
+    <h2>Géolocalisation</h2>
+    <p>CarburantRadar peut utiliser ta position géographique, mais uniquement si tu l'autorises explicitement via la demande de permission de ton navigateur. Cette position sert exclusivement à te montrer les stations-service les plus proches de toi et à calculer les distances/temps de trajet affichés. Tu peux retirer cette autorisation à tout moment dans les réglages de ton navigateur ou de ton appareil ; l'application reste utilisable pour les fonctionnalités ne nécessitant pas de position.</p>
+
+    <h2>Données personnelles</h2>
+    <p>Les favoris, repères, préférences de carburant et de rayon que tu configures sont enregistrés localement sur ton appareil (stockage local du navigateur) et ne sont pas transmis à un serveur, sauf lorsque tu actives explicitement une alerte prix : dans ce cas, ta position et tes préférences d'alerte sont envoyées à notre service de notification, uniquement dans le but de te notifier, et supprimées si tu désactives l'alerte.</p>
+
+    <h2>Publicité et cookies (Google AdSense)</h2>
+    <p>CarburantRadar peut afficher des publicités via Google AdSense. Ce service peut utiliser des cookies ou des identifiants publicitaires afin de proposer des annonces, y compris potentiellement personnalisées selon tes préférences de consentement. Google AdSense fonctionne selon sa propre politique de confidentialité, disponible sur policies.google.com/privacy. Tu peux gérer tes préférences publicitaires directement depuis les paramètres de ton compte Google ou via les outils de gestion du consentement proposés par l'application le cas échéant.</p>
+
+    <h2>Pas de revente de données</h2>
+    <p>Nous ne vendons ni ne louons tes données personnelles à des tiers. Les seules données transmises à des services tiers sont celles strictement nécessaires au fonctionnement de l'application (récupération des prix publics, calcul d'itinéraires, notifications d'alerte si activées).</p>
+
+    <h2>Tes droits</h2>
+    <p>Conformément au Règlement Général sur la Protection des Données (RGPD), tu disposes d'un droit d'accès, de rectification, de suppression et d'opposition concernant tes données personnelles. Pour toute demande, tu peux nous contacter à l'adresse indiquée dans la page Contact. Tu peux également supprimer à tout moment les données stockées localement en effaçant les données de navigation liées à ce site.</p>
+    <div class="app-footer">
+      <div class="footer-copy">© 2026 CarburantRadar</div>
+      <div class="footer-links">
+        <a onclick="showPage(&#39;apropos&#39;)">À propos</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;mentions&#39;)">Mentions légales</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;confidentialite&#39;)">Politique de confidentialité</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;contact&#39;)">Contact</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="page-contact">
+  <div style="padding:20px" class="info-page">
+    <button class="info-back" onclick="showPage('radar')">← Retour</button>
+    <h1>✉️ Contact</h1>
+    <p>Une question, un signalement de prix erroné, une suggestion d'amélioration ? N'hésite pas à nous écrire, nous répondons avec plaisir.</p>
+    <a class="contact-btn" id="contactMailBtn" href="#">✉️ Envoyer un email</a>
+    <div class="info-card">
+      <div class="info-field">Adresse e-mail</div>
+      <div class="info-value" id="contactEmailDisplay"></div>
+    </div>
+    <div class="app-footer">
+      <div class="footer-copy">© 2026 CarburantRadar</div>
+      <div class="footer-links">
+        <a onclick="showPage(&#39;apropos&#39;)">À propos</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;mentions&#39;)">Mentions légales</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;confidentialite&#39;)">Politique de confidentialité</a><span class="footer-sep">·</span>
+        <a onclick="showPage(&#39;contact&#39;)">Contact</a>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -248,9 +429,12 @@ button{width:100%;padding:15px;background:#f5a623;color:#000;border:none;border-
       <div class="alert-status" id="alertStatus">Alertes désactivées</div>
     </div>
   </div>
-  <div class="acc-header" onclick="toggleAcc('aboutAcc')"><div class="acc-title">ℹ️ À propos</div><div class="acc-arrow" id="aboutAccArrow">▼</div></div>
+  <div class="acc-header" onclick="toggleAcc('aboutAcc')"><div class="acc-title">ℹ️ Informations</div><div class="acc-arrow" id="aboutAccArrow">▼</div></div>
   <div class="acc-body" id="aboutAcc">
-    <div class="about-box"><b style="color:#e8e8f0">CarburantRadar v1.2</b><br>Prix en temps réel fournis par le gouvernement français (data.economie.gouv.fr).<br><br>Si vous souhaitez avoir des renseignements, veuillez me contacter à cette adresse: emilienzabukovec09@gmail.com<br><br>Développé par <b style="color:#f5a623">Emilien Zabukovec</b></div>
+    <button class="side-item" style="width:100%;text-align:left;border:none;cursor:pointer;font:inherit;color:#e8e8f0;font-weight:600;font-size:14px" onclick="closeMenu();showPage('apropos')">ℹ️ À propos</button>
+    <button class="side-item" style="width:100%;text-align:left;border:none;cursor:pointer;font:inherit;color:#e8e8f0;font-weight:600;font-size:14px" onclick="closeMenu();showPage('mentions')">📄 Mentions légales</button>
+    <button class="side-item" style="width:100%;text-align:left;border:none;cursor:pointer;font:inherit;color:#e8e8f0;font-weight:600;font-size:14px" onclick="closeMenu();showPage('confidentialite')">🔒 Politique de confidentialité</button>
+    <button class="side-item" style="width:100%;text-align:left;border:none;cursor:pointer;font:inherit;color:#e8e8f0;font-weight:600;font-size:14px;margin-bottom:0" onclick="closeMenu();showPage('contact')">✉️ Contact</button>
   </div>
 </div>
 
@@ -315,10 +499,25 @@ function showPage(name){
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('.nav-btn').forEach(function(b){b.classList.remove('active');});
   document.getElementById('page-'+name).classList.add('active');
-  document.getElementById('nav-'+name).classList.add('active');
+  var navBtn=document.getElementById('nav-'+name);
+  if(navBtn)navBtn.classList.add('active'); // les pages d'info (à propos, mentions...) n'ont pas de bouton dans la nav du bas
   if(name==='map') initMap();
   if(name==='trajet') initTrajetPage();
   if(name==='analyse') initAnalysePage();
+  if(name==='mentions'||name==='contact') initPagesInfo();
+  window.scrollTo(0,0);
+}
+
+// Adresse de contact centralisée : modifie uniquement cette variable pour la mettre à jour partout
+// (page Contact, mentions légales).
+var CONTACT_EMAIL='emilienzabukovec09@gmail.com';
+function initPagesInfo(){
+  var mEmail=document.getElementById('mentionsEmail');
+  if(mEmail)mEmail.textContent=CONTACT_EMAIL;
+  var cEmail=document.getElementById('contactEmailDisplay');
+  if(cEmail)cEmail.textContent=CONTACT_EMAIL;
+  var cBtn=document.getElementById('contactMailBtn');
+  if(cBtn)cBtn.href='mailto:'+CONTACT_EMAIL;
 }
 
 function initMap(){
