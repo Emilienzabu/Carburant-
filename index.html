@@ -2,6 +2,8 @@
 <html lang="fr">
 <head>
 <link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CarburantRadar</title>
@@ -483,8 +485,21 @@ var OSRM='https://router.project-osrm.org/table/v1/driving/';
 var map=null,mapInit=false,userMarker=null,stationMarkers=[];
 var analyseReqId=0;
 var analyseChart=null; // {dates,serieStation,serieMoy,pad,gW,gH,minV,rangeV,W,H,n}
+// Clé publique VAPID pour le Web Push (la clé privée correspondante reste uniquement côté Worker)
+var VAPID_PUBLIC_KEY='BPHVgkAbOiXtOm4NBH3tuLf4Yu1ABF6hnaSx3v41bDw03gmlOhqoDwaFkV9xYWvEJfdxp0zZO8tGWUoNuYqdhos';
+function urlBase64ToUint8Array(base64String){
+  var padding='='.repeat((4-base64String.length%4)%4);
+  var base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  var rawData=atob(base64),outputArray=new Uint8Array(rawData.length);
+  for(var i=0;i<rawData.length;i++)outputArray[i]=rawData.charCodeAt(i);
+  return outputArray;
+}
 
 setTimeout(function(){var s=document.getElementById('splash');if(s)s.style.display='none';},3000);
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('service-worker.js').catch(function(){});
+}
 
 window.addEventListener('load',function(){
   document.querySelectorAll('.fb').forEach(function(b){b.classList.remove('a');if(b.dataset.f===fu)b.classList.add('a');});
@@ -660,12 +675,22 @@ function confirmAlert(){
   var carb=document.getElementById('alertCarb').value,locVal=document.getElementById('alertLoc').value,lat2,lon2;
   var rayon=parseInt(document.getElementById('alertRayon').value),seuil=parseInt(document.getElementById('alertSeuil').value);
   if(locVal==='current'){lat2=la;lon2=lo;}else{var rep=getReps()[parseInt(locVal)];lat2=rep.lat;lon2=rep.lon;}
-  if(!('Notification' in window)){alert('Notifications non supportées.');closeAlertModal();return;}
+  if(!('Notification' in window)||!('serviceWorker' in navigator)||!('PushManager' in window)){alert('Notifications non supportées sur ce navigateur.');closeAlertModal();return;}
   Notification.requestPermission().then(function(perm){
     if(perm!=='granted'){alert('Autorise les notifications.');closeAlertModal();return;}
-    fetch(PROXY+'/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:lat2,lon:lon2,carburant:carb,rayon:rayon,seuil:seuil,names:getNames(),sub:{endpoint:'notif_only'}})})
-    .then(function(r){return r.json();}).then(function(d){if(d.ok){setLs('cr_alert_key',d.key);setLs('cr_alert_info',{carburant:carb,lat:lat2,lon:lon2,rayon:rayon,seuil:seuil});document.getElementById('alertModal').classList.remove('on');updateAlertUI();}})
-    .catch(function(){alert('Erreur activation.');closeAlertModal();});
+    navigator.serviceWorker.ready.then(function(reg){
+      // Réutilise l'abonnement push existant s'il y en a déjà un, sinon en crée un nouveau
+      return reg.pushManager.getSubscription().then(function(existant){
+        if(existant)return existant;
+        return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
+      });
+    }).then(function(subscription){
+      fetch(PROXY+'/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:lat2,lon:lon2,carburant:carb,rayon:rayon,seuil:seuil,names:getNames(),sub:subscription.toJSON()})})
+      .then(function(r){return r.json();}).then(function(d){
+        if(d.ok){setLs('cr_alert_key',d.key);setLs('cr_alert_info',{carburant:carb,lat:lat2,lon:lon2,rayon:rayon,seuil:seuil});document.getElementById('alertModal').classList.remove('on');updateAlertUI();}
+        else{alert('Erreur activation.');closeAlertModal();}
+      }).catch(function(){alert('Erreur activation.');closeAlertModal();});
+    }).catch(function(){alert('Impossible de créer l\'abonnement aux notifications sur cet appareil.');closeAlertModal();});
   });
 }
 function deactivateAlert(){
